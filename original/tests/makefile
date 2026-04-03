@@ -113,8 +113,8 @@ giffilter-regress: public_api_regress
 	@rm -f $@.*.regress
 
 giffix-regress: public_api_regress
-	@echo "giffix: Checking that truncated GIF input is rejected by the public decoder."
-	@head --bytes=-20 <$(PICS)/treescap.gif | $(APITEST) malformed -
+	@echo "giffix: Testing giffix behavior"
+	@head --bytes=-20 <$(PICS)/treescap.gif | $(APITEST) repair - | $(APITEST) icon - | diff -u giffixed.ico -
 
 gifsponge-regress: public_api_regress
 	@for test in $(GIFS); \

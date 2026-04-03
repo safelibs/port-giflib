@@ -59,6 +59,7 @@ static void dump_extensions(FILE *out, GifFileType *gif, int extension_count,
                             ExtensionBlock *extension_blocks);
 static Buffer dump_icon(const Buffer *input);
 static Buffer lowlevel_copy(const Buffer *input);
+static Buffer repair_truncated_gif(const Buffer *input);
 static void copy_extension_blocks(int source_count,
                                   const ExtensionBlock *source_blocks,
                                   int *target_count,
@@ -75,7 +76,7 @@ static void draw_text_line_with_public_font(SavedImage *image,
 static void usage(void) {
 	fprintf(stderr,
 	        "usage: public_api_regress "
-	        "{render|map|dump|icon|lowlevel-copy|highlevel-copy|"
+	        "{render|map|dump|icon|lowlevel-copy|repair|highlevel-copy|"
 	        "interlace|generate|malformed} [args]\n");
 	exit(EXIT_FAILURE);
 }
@@ -1189,6 +1190,269 @@ static Buffer lowlevel_copy(const Buffer *input) {
 	return out;
 }
 
+static Buffer repair_truncated_gif(const Buffer *input) {
+	MemoryReader reader = {input->data, input->len, 0};
+	GifFileType *gif_in;
+	GifFileType *gif_out;
+	GifRecordType record_type;
+	Buffer out = {0};
+	GifByteType *extension = NULL;
+	GifRowType line_buffer = NULL;
+	ColorMapObject *color_map = NULL;
+	int error_code = 0;
+	int ext_code = 0;
+	int darkest_color = 0;
+	int color_intensity = 10000;
+	int image_num = 0;
+
+	gif_in = DGifOpen(&reader, memory_read, &error_code);
+	if (gif_in == NULL) {
+		fatal("DGifOpen failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+	gif_out = EGifOpen(&out, memory_write, &error_code);
+	if (gif_out == NULL) {
+		(void)DGifCloseFile(gif_in, NULL);
+		fatal("EGifOpen failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+
+	if (EGifPutScreenDesc(gif_out, gif_in->SWidth, gif_in->SHeight,
+	                      gif_in->SColorResolution,
+	                      gif_in->SBackGroundColor,
+	                      gif_in->SColorMap) == GIF_ERROR) {
+		(void)DGifCloseFile(gif_in, NULL);
+		(void)EGifCloseFile(gif_out, NULL);
+		buffer_free(&out);
+		fatal("EGifPutScreenDesc failed: %s",
+		      gif_error_string_or_default(gif_out->Error));
+	}
+
+	line_buffer = xmalloc((size_t)gif_in->SWidth);
+
+	do {
+		if (DGifGetRecordType(gif_in, &record_type) == GIF_ERROR) {
+			free(line_buffer);
+			(void)DGifCloseFile(gif_in, NULL);
+			(void)EGifCloseFile(gif_out, NULL);
+			buffer_free(&out);
+			fatal("DGifGetRecordType failed: %s",
+			      gif_error_string_or_default(gif_in->Error));
+		}
+
+		switch (record_type) {
+		case IMAGE_DESC_RECORD_TYPE: {
+			int row;
+			int col;
+			int width;
+			int height;
+			int i;
+			int j;
+
+			if (DGifGetImageDesc(gif_in) == GIF_ERROR) {
+				free(line_buffer);
+				(void)DGifCloseFile(gif_in, NULL);
+				(void)EGifCloseFile(gif_out, NULL);
+				buffer_free(&out);
+				fatal("DGifGetImageDesc failed: %s",
+				      gif_error_string_or_default(
+				          gif_in->Error));
+			}
+			if (gif_in->Image.Interlace) {
+				free(line_buffer);
+				(void)DGifCloseFile(gif_in, NULL);
+				(void)EGifCloseFile(gif_out, NULL);
+				buffer_free(&out);
+				fatal("Cannot fix interlaced images.");
+			}
+
+			row = gif_in->Image.Top;
+			col = gif_in->Image.Left;
+			width = gif_in->Image.Width;
+			height = gif_in->Image.Height;
+			image_num++;
+			if (width > gif_in->SWidth) {
+				free(line_buffer);
+				(void)DGifCloseFile(gif_in, NULL);
+				(void)EGifCloseFile(gif_out, NULL);
+				buffer_free(&out);
+				fatal("Image is wider than total");
+			}
+
+			if (EGifPutImageDesc(gif_out, col, row, width, height,
+			                     false, gif_in->Image.ColorMap) ==
+			    GIF_ERROR) {
+				free(line_buffer);
+				(void)DGifCloseFile(gif_in, NULL);
+				(void)EGifCloseFile(gif_out, NULL);
+				buffer_free(&out);
+				fatal("EGifPutImageDesc failed: %s",
+				      gif_error_string_or_default(
+				          gif_out->Error));
+			}
+
+			color_map = gif_in->Image.ColorMap != NULL
+			                ? gif_in->Image.ColorMap
+			                : gif_in->SColorMap;
+			darkest_color = 0;
+			color_intensity = 10000;
+			if (color_map == NULL) {
+				free(line_buffer);
+				(void)DGifCloseFile(gif_in, NULL);
+				(void)EGifCloseFile(gif_out, NULL);
+				buffer_free(&out);
+				fatal("Image does not have a colormap");
+			}
+			for (i = 0; i < color_map->ColorCount; i++) {
+				j = ((int)color_map->Colors[i].Red) * 30 +
+				    ((int)color_map->Colors[i].Green) * 59 +
+				    ((int)color_map->Colors[i].Blue) * 11;
+				if (j < color_intensity) {
+					color_intensity = j;
+					darkest_color = i;
+				}
+			}
+
+			for (i = 0; i < height; i++) {
+				if (DGifGetLine(gif_in, line_buffer, width) ==
+				    GIF_ERROR) {
+					break;
+				}
+				if (EGifPutLine(gif_out, line_buffer, width) ==
+				    GIF_ERROR) {
+					free(line_buffer);
+					(void)DGifCloseFile(gif_in, NULL);
+					(void)EGifCloseFile(gif_out, NULL);
+					buffer_free(&out);
+					fatal("EGifPutLine failed: %s",
+					      gif_error_string_or_default(
+					          gif_out->Error));
+				}
+			}
+
+			if (i < height) {
+				for (j = 0; j < width; j++) {
+					line_buffer[j] = darkest_color;
+				}
+				for (; i < height; i++) {
+					if (EGifPutLine(gif_out, line_buffer,
+					                width) ==
+					    GIF_ERROR) {
+						free(line_buffer);
+						(void)DGifCloseFile(gif_in,
+						                    NULL);
+						(void)EGifCloseFile(gif_out,
+						                    NULL);
+						buffer_free(&out);
+						fatal("EGifPutLine failed: %s",
+						      gif_error_string_or_default(
+						          gif_out->Error));
+					}
+				}
+				record_type = TERMINATE_RECORD_TYPE;
+			}
+			(void)image_num;
+			break;
+		}
+		case EXTENSION_RECORD_TYPE:
+			if (DGifGetExtension(gif_in, &ext_code, &extension) ==
+			    GIF_ERROR) {
+				free(line_buffer);
+				(void)DGifCloseFile(gif_in, NULL);
+				(void)EGifCloseFile(gif_out, NULL);
+				buffer_free(&out);
+				fatal("DGifGetExtension failed: %s",
+				      gif_error_string_or_default(
+				          gif_in->Error));
+			}
+			if (EGifPutExtensionLeader(gif_out, ext_code) ==
+			    GIF_ERROR) {
+				free(line_buffer);
+				(void)DGifCloseFile(gif_in, NULL);
+				(void)EGifCloseFile(gif_out, NULL);
+				buffer_free(&out);
+				fatal("EGifPutExtensionLeader failed: %s",
+				      gif_error_string_or_default(
+				          gif_out->Error));
+			}
+			if (extension != NULL) {
+				if (EGifPutExtensionBlock(gif_out,
+				                          extension[0],
+				                          extension + 1) ==
+				    GIF_ERROR) {
+					free(line_buffer);
+					(void)DGifCloseFile(gif_in, NULL);
+					(void)EGifCloseFile(gif_out, NULL);
+					buffer_free(&out);
+					fatal("EGifPutExtensionBlock failed: "
+					      "%s",
+					      gif_error_string_or_default(
+					          gif_out->Error));
+				}
+			}
+			while (extension != NULL) {
+				if (DGifGetExtensionNext(gif_in, &extension) ==
+				    GIF_ERROR) {
+					free(line_buffer);
+					(void)DGifCloseFile(gif_in, NULL);
+					(void)EGifCloseFile(gif_out, NULL);
+					buffer_free(&out);
+					fatal("DGifGetExtensionNext failed: "
+					      "%s",
+					      gif_error_string_or_default(
+					          gif_in->Error));
+				}
+				if (extension != NULL) {
+					if (EGifPutExtensionBlock(
+					        gif_out, extension[0],
+					        extension + 1) ==
+					    GIF_ERROR) {
+						free(line_buffer);
+						(void)DGifCloseFile(gif_in,
+						                    NULL);
+						(void)EGifCloseFile(gif_out,
+						                    NULL);
+						buffer_free(&out);
+						fatal("EGifPutExtensionBlock "
+						      "failed: %s",
+						      gif_error_string_or_default(
+						          gif_out->Error));
+					}
+				}
+			}
+			if (EGifPutExtensionTrailer(gif_out) == GIF_ERROR) {
+				free(line_buffer);
+				(void)DGifCloseFile(gif_in, NULL);
+				(void)EGifCloseFile(gif_out, NULL);
+				buffer_free(&out);
+				fatal("EGifPutExtensionTrailer failed: %s",
+				      gif_error_string_or_default(
+				          gif_out->Error));
+			}
+			break;
+		case TERMINATE_RECORD_TYPE:
+			break;
+		default:
+			break;
+		}
+	} while (record_type != TERMINATE_RECORD_TYPE);
+
+	free(line_buffer);
+	if (DGifCloseFile(gif_in, &error_code) == GIF_ERROR) {
+		(void)EGifCloseFile(gif_out, NULL);
+		buffer_free(&out);
+		fatal("DGifCloseFile failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+	if (EGifCloseFile(gif_out, &error_code) == GIF_ERROR) {
+		buffer_free(&out);
+		fatal("EGifCloseFile failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+
+	return out;
+}
+
 static void copy_extension_blocks(int source_count,
                                   const ExtensionBlock *source_blocks,
                                   int *target_count,
@@ -1506,6 +1770,10 @@ int main(int argc, char **argv) {
 	} else if (strcmp(argv[1], "lowlevel-copy") == 0) {
 		input = read_input(argc >= 3 ? argv[2] : "-");
 		output = lowlevel_copy(&input);
+		write_stdout(&output);
+	} else if (strcmp(argv[1], "repair") == 0) {
+		input = read_input(argc >= 3 ? argv[2] : "-");
+		output = repair_truncated_gif(&input);
 		write_stdout(&output);
 	} else if (strcmp(argv[1], "highlevel-copy") == 0) {
 		input = read_input(argc >= 3 ? argv[2] : "-");
