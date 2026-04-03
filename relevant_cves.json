@@ -1,0 +1,124 @@
+{
+  "generated_at": "2026-04-03T04:28:48.506264Z",
+  "generated_from": "/home/yans/code/safelibs/ported/giflib/all_cves.json",
+  "analysis_scope": "giflib core library Rust reimplementation; standalone utilities treated as out of scope unless they inform core library logic",
+  "selection_rule": [
+    "Exclude CVEs whose primary failure mode is memory corruption (buffer overflow, over-read, use-after-free, double-free).",
+    "Retain only non-memory-corruption issues that could still occur in a safe Rust port of the core giflib library.",
+    "Treat utility-only issues as not relevant for this library-focused port unless they expose shared library logic concerns."
+  ],
+  "reviewed_cve_count": 17,
+  "selected_cve_count": 2,
+  "selected_cves": [
+    {
+      "cve_id": "CVE-2005-2974",
+      "issue_type": "null dereference on malformed input",
+      "component_scope": "core library decoder path (legacy libungif-lineage issue)",
+      "may_affect_rust_reimplementation": true,
+      "rust_relevance_rationale": "Safe Rust removes raw null-pointer dereferences, but a malformed-input-triggered invalid-state path can still surface as a panic or early abort if the port uses unchecked indexing, unwrap/expect, or equivalent assumptions during decoding.",
+      "selection_reason": "This is a core-library denial-of-service condition caused by crafted input and is not described as a buffer overwrite or other memory-corruption primitive.",
+      "source_description": "libungif library before 4.1.0 allows attackers to cause a denial of service via a crafted GIF file that triggers a null dereference.",
+      "tracker_notes": [
+        "Just a bug, hardly security implications"
+      ],
+      "local_source_mentions": [
+        {
+          "path": "original/NEWS",
+          "line": 373,
+          "text": "* Fixes applied for CVE-2005-2974 and CVE-2005-3350"
+        },
+        {
+          "path": "original/debian/changelog",
+          "line": 438,
+          "text": "* Adding patch from libungif to fix CVE-2005-2974 and CVE-2005-3350."
+        },
+        {
+          "path": "original/debian/changelog",
+          "line": 482,
+          "text": "- isn't affected by CVE-2005-2974 and CVE-2005-3350 (Closes: #395382)."
+        }
+      ],
+      "scope_note": "Legacy libungif-lineage issue carried on Debian's giflib source-package tracker; Debian notes giflib 4.1.4-1 and later as fixed."
+    },
+    {
+      "cve_id": "CVE-2019-15133",
+      "issue_type": "divide-by-zero on malformed image dimensions",
+      "component_scope": "core library decoder path (DGifSlurp)",
+      "may_affect_rust_reimplementation": true,
+      "rust_relevance_rationale": "Rust does not eliminate arithmetic faults: integer division by zero in safe Rust still panics. A Rust decoder must therefore preserve the upstream validation of zero or otherwise invalid dimensions before performing derived calculations.",
+      "selection_reason": "This is a decoder logic and input-validation bug in library code, not a memory-corruption issue, and it remains directly relevant to a safe Rust port.",
+      "source_description": "In GIFLIB before 2019-02-16, a malformed GIF file triggers a divide-by-zero exception in the decoder function DGifSlurp in dgif_lib.c if the height field of the ImageSize data structure is equal to zero.",
+      "tracker_notes": [
+        "https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=13008",
+        "https://sourceforge.net/p/giflib/code/ci/799eb6a3af8a3dd81e2429bf11a72a57e541f908/",
+        "https://sourceforge.net/p/giflib/bugs/119/"
+      ],
+      "local_source_mentions": [
+        {
+          "path": "original/NEWS",
+          "line": 109,
+          "text": "* Address SF bug #119: MemorySanitizer: FPE on unknown address. This is CVE-2019-15133"
+        },
+        {
+          "path": "original/debian/changelog",
+          "line": 131,
+          "text": "CVE-2019-15133 sf#119: Closes: #904113"
+        },
+        {
+          "path": "original/debian/changelog",
+          "line": 197,
+          "text": "+ Fixes CVE-2019-15133 - SF bug #119: MemorySanitizer: FPE on unknown"
+        }
+      ]
+    }
+  ],
+  "excluded_non_memory_corruption_candidates": [
+    {
+      "cve_id": "CVE-2021-40633",
+      "issue_type": "memory leak / out-of-memory",
+      "component_scope": "gif2rgb standalone utility",
+      "may_affect_rust_reimplementation": false,
+      "exclusion_reason": "The recorded issue is specific to end-of-run cleanup in the gif2rgb CLI utility, not the core giflib library being ported. The exact leak pattern is also less likely in idiomatic Rust due to ownership-based cleanup.",
+      "source_description": "A memory leak (out-of-memory) in gif2rgb in util/gif2rgb.c in giflib 5.1.4 allows remote attackers trigger an out of memory exception or denial of service via a gif format file.",
+      "tracker_notes": [
+        "https://sourceforge.net/p/giflib/bugs/157/",
+        "Specific to gif2rgb. Crash in CLI tool, no security impact"
+      ],
+      "local_source_mentions": [
+        {
+          "path": "original/debian/changelog",
+          "line": 29,
+          "text": "* Cherry-pick Clean-up-memory-better-at-end-of-run-CVE-2021-40633.patch to"
+        },
+        {
+          "path": "original/debian/changelog",
+          "line": 30,
+          "text": "fix CVE-2021-40633."
+        },
+        {
+          "path": "original/debian/patches/Clean-up-memory-better-at-end-of-run-CVE-2021-40633.patch",
+          "line": 4,
+          "text": "Subject: [PATCH] Clean up memory better at end of run (CVE-2021-40633)"
+        },
+        {
+          "path": "original/debian/patches/series",
+          "line": 7,
+          "text": "Clean-up-memory-better-at-end-of-run-CVE-2021-40633.patch"
+        }
+      ]
+    },
+    {
+      "cve_id": "CVE-2023-39742",
+      "issue_type": "segmentation fault",
+      "component_scope": "getarg utility-support code",
+      "may_affect_rust_reimplementation": false,
+      "exclusion_reason": "The available evidence points to a crash in utility argument-parsing support code rather than the core library decoder/encoder logic. That makes it out of scope for the library reimplementation step.",
+      "source_description": "giflib v5.2.1 was discovered to contain a segmentation fault via the component getarg.c.",
+      "tracker_notes": [
+        "https://sourceforge.net/p/giflib/bugs/166/",
+        "Crash in CLI, negligible security impact"
+      ],
+      "local_source_mentions": []
+    }
+  ]
+}
