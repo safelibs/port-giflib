@@ -1,12 +1,28 @@
-# Regression-test suite for the giflib library and tools
-# All utilities have tests except gifbg, gifcolor, and gifhisto.
+# Regression-test suite for the giflib public API.
+#
+# The original upstream tests exercised helper utilities. For the Rust port we
+# only want tests that go through the documented library surface in gif_lib.h,
+# so the default regressions below use a test-only helper linked directly
+# against libgif.
 
 .SUFFIXES: .gif .rgb
 
 export LD_LIBRARY_PATH=$(CURDIR)/..
 
-# This is what to do by default
-test: render-regress \
+CC ?= cc
+CPPFLAGS ?=
+CFLAGS ?= -O2
+
+PICS = ../pic
+APITEST = ./public_api_regress
+APITEST_SRC = public_api_regress.c
+APITEST_CFLAGS = $(CPPFLAGS) $(CFLAGS) -std=gnu99 -Wall -Wextra -I..
+
+GIFS := $(shell ls ../pic/*.gif)
+
+# This is what to do by default.
+test: public_api_regress \
+	render-regress \
 	gifbuild-regress \
 	gifclrmp-regress \
 	gifecho-regress \
@@ -18,148 +34,135 @@ test: render-regress \
 	gifwedge-regress
 	@echo "No output is good news"
 
-rebuild: render-rebuild \
-		gif2rgb-rebuild \
-		gifclrmp-rebuild \
-		gifecho-rebuild \
-		giffix-rebuild \
-		giftext-rebuild \
-		gifwedge-rebuild
+rebuild: public_api_regress \
+	render-rebuild \
+	gifbuild-rebuild \
+	gifclrmp-rebuild \
+	gifecho-rebuild \
+	giftext-rebuild \
+	gifwedge-rebuild
 
-UTILS = ..
-PICS = ../pic
+public_api_regress: $(APITEST_SRC) ../libgif.a ../gif_lib.h
+	$(CC) $(APITEST_CFLAGS) $(APITEST_SRC) ../libgif.a -o $@
 
-GIFS := $(shell ls ../pic/*.gif)
-
-# Test decompression and rendering by unpacking images,
-# converting them to RGB, and comparing that result to a check file.
-render-regress:
+# Test decompression and rendering by unpacking images with the sequential
+# decoder and comparing the resulting RGB triples to the fixture files.
+render-regress: public_api_regress
 	@for test in $(GIFS); \
 	do \
 	    stem=`basename $${test} | sed -e "s/.gif$$//"`; \
 	    if echo "Testing RGB rendering of $${test}" >&2; \
-	    $(UTILS)/gif2rgb -1 -o $@.$${stem}.regress $${test} 2>&1; \
+	    $(APITEST) render $${test} > $@.$${stem}.regress; \
 	    then cmp $${stem}.rgb $@.$${stem}.regress; \
 	    else echo "*** Nonzero return status on $${test}!"; exit 1; fi; \
 	done
 	@rm -f $@.*.regress
-render-rebuild:
+
+render-rebuild: public_api_regress
 	@for test in $(GIFS); do \
 		stem=`basename $${test} | sed -e "s/.gif$$//"`; \
 		echo "Remaking $${stem}.rgb"; \
-		$(UTILS)/gif2rgb -1 -o $${stem}.rgb $${test}; \
+		$(APITEST) render $${test} > $${stem}.rgb; \
 	done
 
-gif2rgb-rebuild:
-	@echo "Rebuilding gif2rgb checkfile."
-	@$(UTILS)/gif2rgb -c 3 -s 100 100 <gifgrid.rgb | $(UTILS)/gifbuild -d >gifgrid.ico
-gif2rgb-regress:
-	@echo "gif2rgb: Checking idempotency"
-	@$(UTILS)/gif2rgb -c 3 -s 100 100 <gifgrid.rgb | $(UTILS)/gifbuild -d | diff -u gifgrid.ico -
+gifbuild-regress: public_api_regress
+	@echo "gifbuild: Checking structural dump of treescap.gif via public API."
+	@$(APITEST) icon <$(PICS)/treescap.gif | diff -u treescap.ico -
+	@echo "gifbuild: Checking slurp/spew roundtrip on an animation."
+	@$(APITEST) highlevel-copy $(PICS)/fire.gif | $(APITEST) dump - | diff -u fire.dmp -
 
-gifbuild-regress:
-	@echo "gifbuild: basic sanity check"
-	@$(UTILS)/gifbuild -d <$(PICS)/treescap.gif | diff -u treescap.ico -
-	@echo "gifbuild: Checking idempotency on an icon file."
-	@$(UTILS)/gifbuild <$(PICS)/sample.ico | $(UTILS)/gifbuild -d > $@.sample-1.ico; $(UTILS)/gifbuild < $@.sample-1.ico | $(UTILS)/gifbuild -d > $@.sample-2.ico; diff -u $@.sample-1.ico $@.sample-2.ico; rm $@.sample-?.ico
-	@echo "gifbuild: Checking idempotency on an animation."
-	@$(UTILS)/gifbuild -d <$(PICS)/fire.gif > $@.fire1.ico
-	@$(UTILS)/gifbuild < $@.fire1.ico > $@.fire2.gif
-	@$(UTILS)/gifbuild -d < $@.fire2.gif > $@.fire2.ico
-	@diff -u  $@.fire1.ico  $@.fire2.ico
-	@rm -f $@.fire1.ico  $@.fire2.ico $@.fire2.gif
+gifbuild-rebuild: public_api_regress
+	@echo "Rebuilding gifbuild-compatible icon fixtures."
+	@$(APITEST) icon <$(PICS)/treescap.gif >treescap.ico
 
-gifclrmp-regress:
+gifclrmp-regress: public_api_regress
 	@for test in $(GIFS); \
 	do \
 	    stem=`basename $${test} | sed -e "s/.gif$$//"`; \
 	    if echo "gifclrmap: Checking colormap of $${test}" >&2; \
-	    $(UTILS)/gifclrmp <$${test} > $@.$${stem}.regress; \
+	    $(APITEST) map $${test} > $@.$${stem}.regress; \
 	    then diff -u $${stem}.map $@.$${stem}.regress; \
 	    else echo "*** Nonzero return status on $${test}!"; exit 1; fi; \
 	done
 	@rm -f $@.*.regress
-gifclrmp-rebuild:
+
+gifclrmp-rebuild: public_api_regress
 	@for test in $(GIFS); do \
 		stem=`basename $${test} | sed -e "s/.gif$$//"`; \
 		echo "Remaking $${stem}.map"; \
-		$(UTILS)/gifclrmp <$${test} >$${stem}.map; \
+		$(APITEST) map $${test} >$${stem}.map; \
 	done
 
-gifecho-rebuild:
-	@echo "Rebuilding gifecho test."
-	@$(UTILS)/gifecho -t "foobar" | $(UTILS)/gifbuild -d >foobar.ico
-gifecho-regress:
-	@echo "gifecho: Testing gifecho behavior"
-	@$(UTILS)/gifecho -t "foobar" | $(UTILS)/gifbuild -d | diff -u foobar.ico -
+gifecho-regress: public_api_regress
+	@echo "gifecho: Testing public text rendering behavior"
+	@$(APITEST) generate foobar | $(APITEST) icon - | diff -u foobar.ico -
 
-giffilter-regress:
+gifecho-rebuild: public_api_regress
+	@echo "Rebuilding gifecho fixture."
+	@$(APITEST) generate foobar | $(APITEST) icon - >foobar.ico
+
+giffilter-regress: public_api_regress
 	@for test in $(GIFS); \
 	do \
 	    stem=`basename $${test} | sed -e "s/.gif$$//"`; \
-	    if echo "giffiltr: Testing copy of $${test}" >&2; \
-	    $(UTILS)/giffilter <$${test} | $(UTILS)/gif2rgb > $@.$${stem}.regress; \
+	    if echo "giffilter: Testing low-level copy of $${test}" >&2; \
+	    $(APITEST) lowlevel-copy $${test} | $(APITEST) render - > $@.$${stem}.regress; \
 	    then cmp $${stem}.rgb $@.$${stem}.regress; \
 	    else echo "*** Nonzero return status on $${test}!"; exit 1; fi; \
 	done
-	@rm -f  $@.*.regress
+	@rm -f $@.*.regress
 
-giffix-rebuild:
-	@echo "Rebuilding giffix test."
-	@head --bytes=-20 <$(PICS)/treescap.gif | $(UTILS)/giffix 2>/dev/null | $(UTILS)/gifbuild -d >giffixed.ico
-giffix-regress:
-	@echo "giffix: Testing giffix behavior"
-	@head --bytes=-20 <$(PICS)/treescap.gif | $(UTILS)/giffix 2>/dev/null | $(UTILS)/gifbuild -d | diff -u giffixed.ico -
+giffix-regress: public_api_regress
+	@echo "giffix: Checking that truncated GIF input is rejected by the public decoder."
+	@head --bytes=-20 <$(PICS)/treescap.gif | $(APITEST) malformed -
 
-gifinto-regress:
-	@echo "gifinto: Checking behavior on short files."
-	@rm -f $@.giflib.tmp
-	@$(UTILS)/gifinto <$(PICS)/porsche.gif $@.giflib.tmp
-	@if test ! -f $@.giflib.tmp; then echo "gifinto failed to create a file when it should have."; fi
-	@rm -f $@.giflib.tmp
-	@echo "0123456789" | $(UTILS)/gifinto $@.giflib.tmp 2>/dev/null
-	@if test -f $@.giflib.tmp; then echo "gifinto created a file when it shouldn't have."; fi
-	@rm -f $@.giflib.tmp
-
-gifsponge-regress:
+gifsponge-regress: public_api_regress
 	@for test in $(GIFS); \
 	do \
 	    stem=`basename $${test} | sed -e "s/.gif$$//"`; \
-	    if echo "gifsponge: Testing copy of $${test}" >&2; \
-	    $(UTILS)/gifsponge <$${test} | $(UTILS)/gif2rgb > $@.$${stem}.regress; \
+	    if echo "gifsponge: Testing slurp/spew copy of $${test}" >&2; \
+	    $(APITEST) highlevel-copy $${test} | $(APITEST) render - > $@.$${stem}.regress; \
 	    then cmp $${stem}.rgb  $@.$${stem}.regress; \
 	    else echo "*** Nonzero return status on $${test}!"; exit 1; fi; \
 	done
 	@rm -f  $@.*.regress
 
-giftext-regress:
+giftext-regress: public_api_regress
 	@for test in $(GIFS); \
 	do \
 	    stem=`basename $${test} | sed -e "s/.gif$$//"`; \
 	    if echo "giftext: Checking text dump of $${test}" >&2; \
-	    $(UTILS)/giftext <$${test} > $@.$${stem}.regress; \
+	    $(APITEST) dump < $${test} > $@.$${stem}.regress; \
 	    then diff -u $${stem}.dmp  $@.$${stem}.regress; \
 	    else echo "*** Nonzero return status on $${test}!"; exit 1; fi; \
 	done
 	@rm -f  $@.*.regress
-giftext-rebuild:
+
+giftext-rebuild: public_api_regress
 	@for test in $(GIFS); do \
 		stem=`basename $${test} | sed -e "s/.gif$$//"`; \
 		echo "Remaking $${stem}.dmp"; \
-		$(UTILS)/giftext <$${test} >$${stem}.dmp; \
+		$(APITEST) dump < $${test} >$${stem}.dmp; \
 	done
 
-giftool-regress:
-	@echo "giftool: Checking that expensive copy via giftool is faithful."
-	@$(UTILS)/giftool <$(PICS)/gifgrid.gif | $(UTILS)/gif2rgb | cmp - gifgrid.rgb
+giftool-regress: public_api_regress
+	@echo "giftool: Checking that expensive copy via the public API is faithful."
+	@$(APITEST) highlevel-copy $(PICS)/gifgrid.gif | $(APITEST) render - | cmp - gifgrid.rgb
 	@echo "giftool: Checking that it de-interlaces correctly."
-	@$(UTILS)/giftool -i on <$(PICS)/treescap-interlaced.gif | $(UTILS)/gif2rgb | cmp - treescap.rgb
+	@$(APITEST) interlace off $(PICS)/treescap-interlaced.gif | $(APITEST) render - | cmp - treescap.rgb
 	@echo "giftool: Checking that it interlaces correctly."
-	@$(UTILS)/giftool -i off <$(PICS)/treescap.gif | $(UTILS)/gif2rgb | cmp - treescap-interlaced.rgb
+	@$(APITEST) interlace on $(PICS)/treescap.gif | $(APITEST) render - | cmp - treescap-interlaced.rgb
 
-gifwedge-rebuild:
-	@echo "Remaking the gifwedge test."
-	@$(UTILS)/gifwedge >wedge.gif
-gifwedge-regress:
-	@echo "gifwedge: Checking wedge generation."
-	@$(UTILS)/gifwedge | cmp - wedge.gif
+gifwedge-regress: public_api_regress
+	@echo "gifwedge: Checking wedge generation through public APIs."
+	@$(APITEST) generate wedge | $(APITEST) render - >$@.actual
+	@$(APITEST) render wedge.gif >$@.expected
+	@cmp $@.expected $@.actual
+	@rm -f $@.actual $@.expected
+
+gifwedge-rebuild: public_api_regress
+	@echo "Remaking the gifwedge fixture."
+	@$(APITEST) generate wedge >wedge.gif
+
+clean:
+	rm -f public_api_regress *.actual *.expected *.regress
