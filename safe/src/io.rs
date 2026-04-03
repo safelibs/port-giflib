@@ -3,9 +3,10 @@ use core::ffi::c_char;
 use libc::{mode_t, FILE};
 
 use crate::ffi::GifFileType;
-use crate::state::encoder_state;
+use crate::state::{decoder_state, encoder_state};
 
 const WRITE_MODE: &[u8] = b"wb\0";
+const READ_MODE: &[u8] = b"rb\0";
 
 #[cfg(windows)]
 unsafe fn set_binary_mode(file_handle: i32) {
@@ -16,6 +17,14 @@ unsafe fn set_binary_mode(file_handle: i32) {
 
 #[cfg(not(windows))]
 unsafe fn set_binary_mode(_file_handle: i32) {}
+
+pub(crate) unsafe fn open_input_file(file_name: *const c_char) -> i32 {
+    if file_name.is_null() {
+        return -1;
+    }
+
+    unsafe { libc::open(file_name, libc::O_RDONLY) }
+}
 
 pub(crate) unsafe fn open_output_file(file_name: *const c_char, test_existence: bool) -> i32 {
     if file_name.is_null() {
@@ -38,11 +47,26 @@ pub(crate) unsafe fn close_fd(file_handle: i32) {
     }
 }
 
+pub(crate) unsafe fn fdopen_read(file_handle: i32) -> *mut FILE {
+    unsafe {
+        set_binary_mode(file_handle);
+        libc::fdopen(file_handle, READ_MODE.as_ptr().cast())
+    }
+}
+
 pub(crate) unsafe fn fdopen_write(file_handle: i32) -> *mut FILE {
     unsafe {
         set_binary_mode(file_handle);
         libc::fdopen(file_handle, WRITE_MODE.as_ptr().cast())
     }
+}
+
+pub(crate) unsafe fn fclose_input(file: *mut FILE) -> i32 {
+    if file.is_null() {
+        return 0;
+    }
+
+    unsafe { libc::fclose(file) }
 }
 
 pub(crate) unsafe fn fclose_output(file: *mut FILE) -> i32 {
@@ -51,6 +75,34 @@ pub(crate) unsafe fn fclose_output(file: *mut FILE) -> i32 {
     }
 
     unsafe { libc::fclose(file) }
+}
+
+pub(crate) unsafe fn internal_read(
+    gif_file: *mut GifFileType,
+    buffer: *mut u8,
+    len: usize,
+) -> usize {
+    let state = unsafe { decoder_state(gif_file) };
+    if state.is_null() || buffer.is_null() || len == 0 {
+        return 0;
+    }
+
+    if let Some(read_func) = unsafe { (*state).read_func } {
+        let len = match i32::try_from(len) {
+            Ok(len) => len,
+            Err(_) => return 0,
+        };
+        let read = unsafe { read_func(gif_file, buffer, len) };
+        if read < 0 {
+            0
+        } else {
+            read as usize
+        }
+    } else if unsafe { (*state).file.is_null() } {
+        0
+    } else {
+        unsafe { libc::fread(buffer.cast(), 1, len, (*state).file) }
+    }
 }
 
 pub(crate) unsafe fn internal_write(

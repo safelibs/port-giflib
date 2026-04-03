@@ -9,9 +9,16 @@ pub type GifRowType = *mut GifPixelType;
 pub type GifByteType = u8;
 pub type GifPrefixType = u32;
 pub type GifWord = i32;
+pub type GifRecordType = i32;
 
 pub const GIF_ERROR: i32 = 0;
 pub const GIF_OK: i32 = 1;
+
+pub const UNDEFINED_RECORD_TYPE: GifRecordType = 0;
+pub const SCREEN_DESC_RECORD_TYPE: GifRecordType = 1;
+pub const IMAGE_DESC_RECORD_TYPE: GifRecordType = 2;
+pub const EXTENSION_RECORD_TYPE: GifRecordType = 3;
+pub const TERMINATE_RECORD_TYPE: GifRecordType = 4;
 
 pub const CONTINUE_EXT_FUNC_CODE: i32 = 0x00;
 pub const COMMENT_EXT_FUNC_CODE: i32 = 0xfe;

@@ -38,6 +38,68 @@ unsafe fn gcb_to_extension_impl(
     4
 }
 
+unsafe fn extension_to_gcb_impl(
+    GifExtensionLength: usize,
+    GifExtension: *const GifByteType,
+    GCB: *mut GraphicsControlBlock,
+) -> i32 {
+    if GifExtensionLength != 4 || GifExtension.is_null() || GCB.is_null() {
+        return GIF_ERROR;
+    }
+
+    unsafe {
+        (*GCB).DisposalMode = i32::from((*GifExtension.add(0) >> 2) & 0x07);
+        (*GCB).UserInputFlag.set((*GifExtension.add(0) & 0x02) != 0);
+        (*GCB).DelayTime = i32::from(*GifExtension.add(1)) | (i32::from(*GifExtension.add(2)) << 8);
+        (*GCB).TransparentColor = if (*GifExtension.add(0) & 0x01) != 0 {
+            i32::from(*GifExtension.add(3))
+        } else {
+            NO_TRANSPARENT_COLOR
+        };
+    }
+
+    GIF_OK
+}
+
+unsafe fn saved_extension_to_gcb_impl(
+    GifFile: *mut GifFileType,
+    ImageIndex: i32,
+    GCB: *mut GraphicsControlBlock,
+) -> i32 {
+    if GifFile.is_null() || GCB.is_null() {
+        return GIF_ERROR;
+    }
+
+    unsafe {
+        if ImageIndex < 0
+            || ImageIndex > (*GifFile).ImageCount - 1
+            || (*GifFile).SavedImages.is_null()
+        {
+            return GIF_ERROR;
+        }
+
+        (*GCB).DisposalMode = 0;
+        (*GCB).UserInputFlag.set(false);
+        (*GCB).DelayTime = 0;
+        (*GCB).TransparentColor = NO_TRANSPARENT_COLOR;
+
+        let saved = (*GifFile).SavedImages.add(ImageIndex as usize);
+        let extension_count = usize::try_from((*saved).ExtensionBlockCount).unwrap_or(0);
+        for index in 0..extension_count {
+            let extension: *mut ExtensionBlock = (*saved).ExtensionBlocks.add(index);
+            if (*extension).Function == GRAPHICS_EXT_FUNC_CODE {
+                return extension_to_gcb_impl(
+                    usize::try_from((*extension).ByteCount).unwrap_or(0),
+                    (*extension).Bytes,
+                    GCB,
+                );
+            }
+        }
+    }
+
+    GIF_ERROR
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn EGifGCBToExtension(
     GCB: *const GraphicsControlBlock,
@@ -91,5 +153,27 @@ pub unsafe extern "C" fn EGifGCBToSavedExtension(
             len as u32,
             buffer.as_mut_ptr(),
         )
+    })
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn DGifExtensionToGCB(
+    GifExtensionLength: usize,
+    GifExtension: *const GifByteType,
+    GCB: *mut GraphicsControlBlock,
+) -> i32 {
+    catch_panic_or(GIF_ERROR, || unsafe {
+        extension_to_gcb_impl(GifExtensionLength, GifExtension, GCB)
+    })
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn DGifSavedExtensionToGCB(
+    GifFile: *mut GifFileType,
+    ImageIndex: i32,
+    GCB: *mut GraphicsControlBlock,
+) -> i32 {
+    catch_panic_or(GIF_ERROR, || unsafe {
+        saved_extension_to_gcb_impl(GifFile, ImageIndex, GCB)
     })
 }
