@@ -1,0 +1,311 @@
+linear: true
+yaml_source_mode: inline-only
+verifier_encoding: explicit-phases
+phases:
+  - order: 1
+    id: impl_01_scaffold
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - original/gif_lib.h
+      - original/Makefile
+      - original/debian/libgif7.symbols
+      - original/tests/makefile
+      - original/tests/public_api_regress.c
+      - original/tests/
+      - original/pic/
+  - order: 2
+    id: check_01_scaffold_local
+    type: check
+    bounce_target: impl_01_scaffold
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/include/gif_lib.h
+      - safe/src/
+      - safe/tests/Makefile
+      - safe/tests/abi_layout.c
+      - safe/tests/internal_exports_smoke.c
+      - original/gif_lib.h
+      - original/gif_hash.h
+      - original/debian/libgif7.symbols
+      - original/tests/public_api_regress.c
+      - original/tests/
+      - original/pic/
+  - order: 3
+    id: impl_02_helpers
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/include/gif_lib.h
+      - safe/src/
+      - safe/tests/Makefile
+      - safe/tests/abi_layout.c
+      - safe/tests/internal_exports_smoke.c
+      - original/gifalloc.c
+      - original/gif_err.c
+      - original/gif_font.c
+      - original/gif_hash.c
+      - original/gif_hash.h
+      - original/openbsd-reallocarray.c
+      - original/quantize.c
+      - original/debian/changelog
+      - original/tests/public_api_regress.c
+      - original/tests/
+      - original/pic/
+  - order: 4
+    id: check_02_helpers
+    type: check
+    bounce_target: impl_02_helpers
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/include/gif_lib.h
+      - safe/src/
+      - safe/tests/Makefile
+      - safe/tests/abi_layout.c
+      - safe/tests/internal_exports_smoke.c
+      - original/gif_lib.h
+      - original/gif_hash.h
+      - original/debian/libgif7.symbols
+      - original/tests/public_api_regress.c
+      - original/tests/
+      - original/pic/
+  - order: 5
+    id: impl_03_encode
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/include/gif_lib.h
+      - safe/src/
+      - safe/tests/
+      - original/egif_lib.c
+  - order: 6
+    id: check_03_encode
+    type: check
+    bounce_target: impl_03_encode
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/include/gif_lib.h
+      - safe/src/
+      - safe/tests/Makefile
+      - original/gif_lib.h
+      - original/debian/libgif7.symbols
+      - original/tests/public_api_regress.c
+      - original/tests/
+      - original/pic/
+  - order: 7
+    id: impl_04_decode_core
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/include/gif_lib.h
+      - safe/src/
+      - safe/tests/
+      - original/dgif_lib.c
+  - order: 8
+    id: check_04_decode_core
+    type: check
+    bounce_target: impl_04_decode_core
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/include/gif_lib.h
+      - safe/src/
+      - safe/tests/Makefile
+      - safe/tests/internal_exports_smoke.c
+      - original/gif_lib.h
+      - original/gif_hash.h
+      - original/debian/libgif7.symbols
+      - original/tests/public_api_regress.c
+      - original/tests/
+      - original/pic/
+  - order: 9
+    id: impl_05_security_baseline
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/include/gif_lib.h
+      - safe/src/
+      - safe/tests/Makefile
+      - safe/tests/abi_layout.c
+      - safe/tests/internal_exports_smoke.c
+      - original/Makefile
+      - relevant_cves.json
+      - original/NEWS
+      - original/tests/public_api_regress.c
+      - original/tests/
+      - original/pic/
+  - order: 10
+    id: check_05_security_baseline
+    type: check
+    bounce_target: impl_05_security_baseline
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/include/gif_lib.h
+      - safe/src/
+      - safe/tests/Makefile
+      - safe/tests/internal_exports_smoke.c
+      - safe/tests/malformed_observe.c
+      - safe/tests/capture_malformed_baseline.sh
+      - safe/tests/malformed/
+      - safe/tests/malformed/manifest.txt
+      - safe/tests/malformed/original-baseline.txt
+      - original/Makefile
+      - original/gif_lib.h
+      - original/gif_hash.h
+      - original/debian/libgif7.symbols
+      - original/tests/public_api_regress.c
+      - original/tests/
+      - original/pic/
+  - order: 11
+    id: impl_06_performance
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/include/gif_lib.h
+      - safe/src/
+      - safe/tests/Makefile
+      - safe/tests/malformed_observe.c
+      - safe/tests/capture_malformed_baseline.sh
+      - safe/tests/malformed/
+      - safe/tests/malformed/manifest.txt
+      - safe/tests/malformed/original-baseline.txt
+      - original/Makefile
+      - original/tests/public_api_regress.c
+      - original/tests/gifgrid.rgb
+      - original/pic/welcome2.gif
+      - original/pic/treescap-interlaced.gif
+      - original/pic/fire.gif
+  - order: 12
+    id: check_06_performance
+    type: check
+    bounce_target: impl_06_performance
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/include/gif_lib.h
+      - safe/src/
+      - safe/tests/Makefile
+      - safe/tests/perf_compare.sh
+      - original/Makefile
+      - original/gif_lib.h
+      - original/tests/public_api_regress.c
+      - original/tests/gifgrid.rgb
+      - original/tests/
+      - original/pic/welcome2.gif
+      - original/pic/treescap-interlaced.gif
+      - original/pic/fire.gif
+      - original/pic/
+  - order: 13
+    id: impl_07_packaging
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/include/gif_lib.h
+      - safe/src/
+      - safe/tests/Makefile
+      - safe/tests/perf_compare.sh
+      - original/debian/control
+      - original/debian/rules
+      - original/debian/libgif7.symbols
+      - original/debian/libgif7.install
+      - original/debian/libgif-dev.install
+      - original/debian/pkgconfig/libgif7.pc.in
+      - original/pic/
+      - test-original.sh
+      - dependents.json
+  - order: 14
+    id: check_07_package_build
+    type: check
+    bounce_target: impl_07_packaging
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/include/gif_lib.h
+      - safe/src/
+      - safe/debian/
+      - safe/debian/source/format
+      - original/gif_lib.h
+      - original/debian/libgif7.symbols
+      - original/tests/public_api_regress.c
+      - original/tests/
+  - order: 15
+    id: check_07_downstream
+    type: check
+    bounce_target: impl_07_packaging
+    required_preexisting_inputs:
+      - safe/
+      - original/
+      - test-original.sh
+      - dependents.json
+  - order: 16
+    id: impl_08_final_cleanup
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/include/gif_lib.h
+      - safe/src/
+      - safe/tests/Makefile
+      - safe/tests/abi_layout.c
+      - safe/tests/internal_exports_smoke.c
+      - safe/tests/malformed_observe.c
+      - safe/tests/capture_malformed_baseline.sh
+      - safe/tests/malformed/
+      - safe/tests/malformed/manifest.txt
+      - safe/tests/malformed/original-baseline.txt
+      - safe/tests/perf_compare.sh
+      - safe/debian/
+      - test-original.sh
+      - dependents.json
+      - original/Makefile
+      - original/gif_lib.h
+      - original/gif_hash.h
+      - original/debian/libgif7.symbols
+      - original/tests/public_api_regress.c
+      - original/tests/
+      - original/pic/
+  - order: 17
+    id: check_08_final
+    type: check
+    bounce_target: impl_08_final_cleanup
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/include/gif_lib.h
+      - safe/src/
+      - safe/tests/Makefile
+      - safe/tests/abi_layout.c
+      - safe/tests/internal_exports_smoke.c
+      - safe/tests/malformed_observe.c
+      - safe/tests/capture_malformed_baseline.sh
+      - safe/tests/malformed/
+      - safe/tests/malformed/manifest.txt
+      - safe/tests/malformed/original-baseline.txt
+      - safe/tests/perf_compare.sh
+      - safe/debian/
+      - test-original.sh
+      - dependents.json
+      - original/Makefile
+      - original/gif_lib.h
+      - original/gif_hash.h
+      - original/debian/libgif7.symbols
+      - original/tests/public_api_regress.c
+      - original/tests/
+      - original/pic/
