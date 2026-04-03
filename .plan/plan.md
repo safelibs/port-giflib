@@ -95,8 +95,15 @@ The generated workflow derived from this plan must obey all of the following:
 - Every verifier must be an explicit top-level `check` phase.
 - Every verifier must stay in the implement block it verifies and bounce only to that implement phase.
 - Every implement prompt in the generated workflow must instruct the agent to commit work to git before yielding.
-- This plan refinement itself must be delivered as a planning-only git commit before any follow-on plan review, phase-doc regeneration, or workflow regeneration.
-- Before regenerating `.plan/phases/*.md`, `.plan/workflow-structure.yaml`, or `workflow.yaml`, land the planning artifacts in a planning-only commit. That planning commit may update only `.plan/*` and `workflow.yaml`; it must not modify `safe/`, `original/`, `dependents.json`, `relevant_cves.json`, or other tracked implementation files.
+- Each implementation phase must yield exactly one non-merge git commit. Do not yield multiple commits for one phase; if iterative local work happened, collapse it into one final phase commit before yielding.
+- Each implementation phase commit subject must start with its implement phase ID, so succeeding verifiers can reason about the exact phase diff for that phase.
+- Any review command that inspects a phase diff must inspect the full phase commit as `HEAD^..HEAD` or an equivalent explicit single-commit range, not an unspecified history summary.
+- Immediately before any implement phase yields, after the phase commit is created, the tracked worktree and index must be clean: `git status --short --untracked-files=no` must be empty, `git diff --quiet --exit-code` must succeed, and `git diff --cached --quiet --exit-code` must succeed.
+- Use the tracked-clean contract above, not a fully pristine tree requirement: disposable untracked build outputs may exist, but no tracked file may remain modified outside the yielded commit.
+- Immediately before any verifier, plan review, phase-doc regeneration, or workflow-regeneration step begins, that same tracked-clean condition must already hold. Verifiers must fail fast on tracked dirt before running broader checks so they review only the committed artifact under test.
+- This plan refinement itself must be delivered as a planning-only git commit before any follow-on plan review, phase-doc regeneration, or workflow regeneration, and the tracked worktree must be clean afterward.
+- Any plan review or workflow-generation handoff is invalid if `.plan/plan.md` is modified relative to `HEAD`; succeeding checkers must review the committed plan artifact, not a dirty working copy.
+- Before regenerating `.plan/phases/*.md`, `.plan/workflow-structure.yaml`, or `workflow.yaml`, land the planning artifacts in a planning-only commit and satisfy the tracked-clean handoff contract. That planning commit may update only `.plan/*` and `workflow.yaml`; it must not modify `safe/`, `original/`, `dependents.json`, `relevant_cves.json`, or other tracked implementation files.
 - Every major implementation phase must have:
   - at least one command-heavy tester check
   - at least one senior-review check
@@ -126,6 +133,15 @@ The generated workflow derived from this plan must obey all of the following:
 - Later generated workflow phases must assume the current crate already exports the full symbol surface and already passes the current local matrix. The workflow should focus on verification-driven fixes, not from-zero port bootstrap.
 - `test-original.sh` must be updated in place rather than replaced by a second downstream harness.
 - The final workflow must add scoped downstream execution to `test-original.sh`, with `--scope runtime|source|all` and default `all`, so runtime and source-build dependent classes can be tested in separate linear phases before the final full run.
+- `test-original.sh` argument parsing must complete before any `docker build` or `docker run` side effects. `--help`, missing `--scope` values, invalid `--scope` values, and unexpected positional arguments must all exit before container work begins.
+- The downstream scope contract is fixed:
+  - `runtime`: run the shared setup exactly once (`validate_dependents_inventory`, package build/install, sample discovery, and packaged-linkage assertions), then run only the runtime-dependent app checks.
+  - `source`: run that same shared setup exactly once, then run only the source-build dependent checks.
+  - `all`: run the shared setup exactly once, then run the full runtime subset followed by the full source subset in that order.
+- Later generated verifier phases must assert both positive and negative scope behavior:
+  - `--scope runtime` must include every runtime marker and exclude every source marker.
+  - `--scope source` must include every source marker and exclude every runtime-app marker.
+  - `--scope all` must include both marker sets, keep runtime markers before source markers, and keep the shared setup single-shot rather than repeated per subset.
 - Any downstream failure discovered in a runtime or source-build phase must be paired with a committed regression under `safe/tests/compat/` or a committed extension to `safe/tests/Makefile` before the fix phase yields.
 - `safe/tests/compat/` must be deterministic and repo-local:
   - no vendored copies of downstream source trees
@@ -187,6 +203,13 @@ The generated workflow derived from this plan must obey all of the following:
     - purpose: software-tester verification of the current Rust-only library contract before expensive downstream work begins.
     - commands:
       ```bash
+      if [ -n "$(git status --short --untracked-files=no)" ]; then
+        git status --short --untracked-files=no >&2
+        echo 'tracked worktree must be clean before verification' >&2
+        exit 1
+      fi
+      git diff --quiet --exit-code
+      git diff --cached --quiet --exit-code
       cargo build --manifest-path safe/Cargo.toml --release
       if rg -n 'cc::Build|legacy backend|gif_legacy|\.\./original/.*\.c' safe/build.rs safe/Cargo.toml safe/src; then
         echo 'production build reintroduced original C sources' >&2
@@ -247,7 +270,14 @@ The generated workflow derived from this plan must obey all of the following:
     - purpose: senior-tester review of phase-1 changes, with emphasis on preserving the already passing local contract and avoiding unnecessary churn.
     - commands or review checks:
       ```bash
-      git show --stat --name-only --format=fuller HEAD
+      if [ -n "$(git status --short --untracked-files=no)" ]; then
+        git status --short --untracked-files=no >&2
+        echo 'tracked worktree must be clean before verification' >&2
+        exit 1
+      fi
+      git diff --quiet --exit-code
+      git diff --cached --quiet --exit-code
+      git show --stat --name-only --format=fuller HEAD^..HEAD
       rg -n 'catch_panic_or|catch_error_or|catch_gif_error_or|catch_gif_and_error_or' safe/src
       rg -n 'SAFETY:' safe/src
       rg -n '^compat-regress:' safe/tests/Makefile
@@ -292,6 +322,8 @@ The generated workflow derived from this plan must obey all of the following:
   - update `safe/src/*.rs` only if a local verification rerun exposes a real bug
 - `Implementation Details`:
   - Preserve the current Rust-only build. This phase must not add bootstrap C compilation back into `safe/build.rs`.
+  - Before yielding, create exactly one non-merge git commit for this phase, with a subject that starts with `impl_01_local_contract:`.
+  - After that commit, leave the tracked worktree and index clean before yielding: `git status --short --untracked-files=no` must be empty, `git diff --quiet --exit-code` must succeed, and `git diff --cached --quiet --exit-code` must succeed.
   - Preserve the byte-for-byte public header match between `safe/include/gif_lib.h` and `original/gif_lib.h`.
   - Add `compat-regress` to `safe/tests/Makefile` as the single aggregator for future issue-specific tests.
   - Add `safe/tests/compat/README.md` describing:
@@ -317,6 +349,13 @@ The generated workflow derived from this plan must obey all of the following:
     - purpose: software-tester verification of Debian package contents, installed development surface, and package metadata.
     - commands:
       ```bash
+      if [ -n "$(git status --short --untracked-files=no)" ]; then
+        git status --short --untracked-files=no >&2
+        echo 'tracked worktree must be clean before verification' >&2
+        exit 1
+      fi
+      git diff --quiet --exit-code
+      git diff --cached --quiet --exit-code
       diff -u original/debian/libgif7.symbols safe/debian/libgif7.symbols
       grep -x '3.0 (quilt)' safe/debian/source/format
       rm -f libgif7_*.deb libgif-dev_*.deb libgif7-dbgsym_*.ddeb giflib_*.changes giflib_*.buildinfo
@@ -396,16 +435,54 @@ The generated workflow derived from this plan must obey all of the following:
     - purpose: senior-tester review of `test-original.sh` changes needed for scoped downstream execution.
     - commands or review checks:
       ```bash
+      if [ -n "$(git status --short --untracked-files=no)" ]; then
+        git status --short --untracked-files=no >&2
+        echo 'tracked worktree must be clean before verification' >&2
+        exit 1
+      fi
+      git diff --quiet --exit-code
+      git diff --cached --quiet --exit-code
+      git show --stat --name-only --format=fuller HEAD^..HEAD
       bash -n test-original.sh
-      bash test-original.sh --help > /tmp/test-original-help.txt
+      stub_dir="$(mktemp -d)"
+      cat > "$stub_dir/docker" <<'SH'
+      #!/bin/sh
+      echo 'docker should not run for parse-only paths' >&2
+      exit 97
+      SH
+      chmod +x "$stub_dir/docker"
+      PATH="$stub_dir:$PATH" bash test-original.sh --help > /tmp/test-original-help.txt
       grep -E -- '--scope( |=)(runtime|source|all)|runtime\|source\|all' /tmp/test-original-help.txt
-      if bash test-original.sh --scope bogus >/tmp/test-original-invalid.log 2>&1; then
+      if PATH="$stub_dir:$PATH" bash test-original.sh --scope bogus >/tmp/test-original-invalid.log 2>&1; then
         echo 'invalid scope unexpectedly succeeded' >&2
         exit 1
       fi
       grep -Ei 'invalid scope|usage' /tmp/test-original-invalid.log
+      if grep -F 'docker should not run for parse-only paths' /tmp/test-original-invalid.log; then
+        echo 'invalid scope path invoked docker before rejecting arguments' >&2
+        exit 1
+      fi
+      if PATH="$stub_dir:$PATH" bash test-original.sh --scope >/tmp/test-original-missing.log 2>&1; then
+        echo 'missing scope argument unexpectedly succeeded' >&2
+        exit 1
+      fi
+      grep -Ei 'missing.*scope|usage' /tmp/test-original-missing.log
+      if grep -F 'docker should not run for parse-only paths' /tmp/test-original-missing.log; then
+        echo 'missing scope path invoked docker before rejecting arguments' >&2
+        exit 1
+      fi
+      if PATH="$stub_dir:$PATH" bash test-original.sh unexpected >/tmp/test-original-extra-arg.log 2>&1; then
+        echo 'unexpected positional argument unexpectedly succeeded' >&2
+        exit 1
+      fi
+      grep -Ei 'unexpected argument|usage' /tmp/test-original-extra-arg.log
+      if grep -F 'docker should not run for parse-only paths' /tmp/test-original-extra-arg.log; then
+        echo 'unexpected-argument path invoked docker before rejecting arguments' >&2
+        exit 1
+      fi
       rg -n 'GIFLIB_TEST_SCOPE|--scope' test-original.sh
-      rg -n '^build_safe_packages\(\)|^install_safe_packages\(\)|^resolve_installed_shared_libgif\(\)|^resolve_installed_static_libgif\(\)|^assert_links_to_active_shared_libgif\(\)|^assert_build_uses_active_giflib\(\)' test-original.sh
+      rg -n 'scope=.*all|GIFLIB_TEST_SCOPE=.*all' test-original.sh
+      rg -n '^usage\(\)|^parse_args\(\)|^build_safe_packages\(\)|^install_safe_packages\(\)|^resolve_installed_shared_libgif\(\)|^resolve_installed_static_libgif\(\)|^assert_links_to_active_shared_libgif\(\)|^assert_build_uses_active_giflib\(\)' test-original.sh
       if rg -n '/usr/local|build_original_giflib|assert_uses_original' test-original.sh; then
         echo 'stale original-install logic remains' >&2
         exit 1
@@ -413,7 +490,8 @@ The generated workflow derived from this plan must obey all of the following:
       ```
       Review checks:
       - Confirm the script still builds and installs the exact local safe `.deb`s before any downstream checks.
-      - Confirm runtime and source subsets are gated separately but the default remains `all`.
+      - Confirm `--help`, missing-argument, invalid-scope, and unexpected-argument paths all return before any `docker build` or `docker run`.
+      - Confirm runtime and source subsets are gated separately, the default remains `all`, and `--scope all` still runs runtime markers before source markers after one shared setup pass.
       - Confirm the script still consumes `dependents.json`, `safe/`, and `original/` in place instead of duplicating them.
 - `Preexisting Inputs`:
   - `safe/debian/control`
@@ -444,6 +522,8 @@ The generated workflow derived from this plan must obey all of the following:
   - update `test-original.sh`
   - update `safe/build.rs` only if package/install-path behavior requires it
 - `Implementation Details`:
+  - Before yielding, create exactly one non-merge git commit for this phase, with a subject that starts with `impl_02_package_and_harness:`.
+  - After that commit, leave the tracked worktree and index clean before yielding: `git status --short --untracked-files=no` must be empty, `git diff --quiet --exit-code` must succeed, and `git diff --cached --quiet --exit-code` must succeed.
   - Keep the package names `libgif7` and `libgif-dev`.
   - Keep the local package version suffix `+safelibs...`.
   - Preserve the current library-only packaging surface; do not introduce a `giflib-tools` package from `safe/`.
@@ -453,12 +533,18 @@ The generated workflow derived from this plan must obey all of the following:
     - `--scope source`
     - `--scope all`
     - default `all`
+  - Parse CLI arguments before any `docker build` or `docker run`.
+  - Make `--help`, missing `--scope` arguments, invalid `--scope` values, and unexpected positional arguments fail or exit cleanly before any Docker side effects.
   - Keep package build/install and runtime-linkage resolution shared across scopes so runtime and source phases verify the same installation path.
+  - `--scope runtime` must run the shared setup exactly once and then only the runtime dependent checks.
+  - `--scope source` must run the shared setup exactly once and then only the source-build dependent checks.
+  - `--scope all`, and the implicit no-flag default path, must run the shared setup exactly once and then execute the runtime subset followed by the source subset.
+  - Preserve the existing dependent-specific `log_step` markers because later verifier phases grep for those exact markers.
   - Do not split the downstream logic into a second script; update `test-original.sh` in place.
   - Do not change `dependents.json`; use its current fixed matrix as the source of truth.
 - `Verification`:
   - `check_02_package_surface` must pass before downstream scope phases begin.
-  - `check_02_harness_review` must confirm both scope parsing and the continued absence of `/usr/local` assumptions.
+  - `check_02_harness_review` must confirm side-effect-free parse-only paths, the concrete runtime/source/all scope split, and the continued absence of `/usr/local` assumptions.
 
 ### Phase 3
 
@@ -471,6 +557,13 @@ The generated workflow derived from this plan must obey all of the following:
     - purpose: software-tester execution of the runtime-dependent Docker subset plus the relevant local regression matrix.
     - commands:
       ```bash
+      if [ -n "$(git status --short --untracked-files=no)" ]; then
+        git status --short --untracked-files=no >&2
+        echo 'tracked worktree must be clean before verification' >&2
+        exit 1
+      fi
+      git diff --quiet --exit-code
+      git diff --cached --quiet --exit-code
       cargo build --manifest-path safe/Cargo.toml --release
       make -C safe/tests ORIGINAL_INCLUDEDIR="$PWD/original" ORIGINAL_TESTS_DIR="$PWD/original/tests" ORIGINAL_PIC_DIR="$PWD/original/pic" LIBGIF_INCLUDEDIR="$PWD/safe/include" LIBGIF_LIBDIR="$PWD/safe/target/release" test gif2rgb-regress link-compat-regress internal-export-regress malformed-regress malformed-baseline-regress compat-regress
       original_build_dir="$(mktemp -d)"
@@ -504,15 +597,49 @@ The generated workflow derived from this plan must obey all of the following:
           sys.exit(1)
       PY
       bash -o pipefail -c './test-original.sh --scope runtime | tee /tmp/test-runtime.log'
-      grep -F '==> giflib-tools' /tmp/test-runtime.log
-      grep -F '==> webp' /tmp/test-runtime.log
-      grep -F '==> fbi' /tmp/test-runtime.log
-      grep -F '==> mtpaint' /tmp/test-runtime.log
-      grep -F '==> tracker-extract' /tmp/test-runtime.log
-      grep -F '==> libextractor-plugin-gif' /tmp/test-runtime.log
-      grep -F '==> libcamlimages-ocaml' /tmp/test-runtime.log
-      grep -F '==> libgdal34t64' /tmp/test-runtime.log
-      grep -F 'All downstream checks passed' /tmp/test-runtime.log
+      python3 - <<'PY'
+      from pathlib import Path
+      import sys
+
+      log = Path('/tmp/test-runtime.log').read_text(encoding='utf-8')
+      required = [
+          '==> Building safe Debian packages',
+          '==> Installing safe Debian packages',
+          '==> Verifying runtime linkage to active packaged giflib',
+          '==> giflib-tools',
+          '==> webp',
+          '==> fbi',
+          '==> mtpaint',
+          '==> tracker-extract',
+          '==> libextractor-plugin-gif',
+          '==> libcamlimages-ocaml',
+          '==> libgdal34t64',
+          'All downstream checks passed',
+      ]
+      forbidden = [
+          '==> gdal (source)',
+          '==> exactimage (source)',
+          '==> sail (source)',
+          '==> libwebp (source)',
+          '==> imlib2 (source)',
+      ]
+
+      missing = [marker for marker in required if marker not in log]
+      unexpected = [marker for marker in forbidden if marker in log]
+      count_errors = [
+          marker for marker in required[:3]
+          if log.count(marker) != 1
+      ]
+
+      if missing or unexpected or count_errors:
+          if missing:
+              print('missing runtime-scope markers:', *missing, sep='\n', file=sys.stderr)
+          if unexpected:
+              print('unexpected source-scope markers during runtime scope:', *unexpected, sep='\n', file=sys.stderr)
+          if count_errors:
+              print('shared setup markers must appear exactly once during runtime scope:', *count_errors, sep='\n', file=sys.stderr)
+          sys.exit(1)
+      PY
       ```
   - `check_03_runtime_review`
     - type: `check`
@@ -520,7 +647,14 @@ The generated workflow derived from this plan must obey all of the following:
     - purpose: senior-tester review of runtime-dependent fixes and their regression coverage.
     - commands or review checks:
       ```bash
-      git show --stat --name-only --format=fuller HEAD
+      if [ -n "$(git status --short --untracked-files=no)" ]; then
+        git status --short --untracked-files=no >&2
+        echo 'tracked worktree must be clean before verification' >&2
+        exit 1
+      fi
+      git diff --quiet --exit-code
+      git diff --cached --quiet --exit-code
+      git show --stat --name-only --format=fuller HEAD^..HEAD
       find safe/tests/compat -maxdepth 2 -type f | LC_ALL=C sort
       rg -n 'runtime|giftext|gif2webp|fbi|mtpaint|tracker|extractor|camlimages|gdal' safe/tests/compat safe/tests/Makefile test-original.sh
       rg -n 'SAFETY:' safe/src
@@ -552,6 +686,8 @@ The generated workflow derived from this plan must obey all of the following:
   - create or update issue-specific reproducers under `safe/tests/compat/`
   - update `test-original.sh` only if the runtime probe itself needs stabilization
 - `Implementation Details`:
+  - Before yielding, create exactly one non-merge git commit for this phase, with a subject that starts with `impl_03_runtime_dependents:`.
+  - After that commit, leave the tracked worktree and index clean before yielding: `git status --short --untracked-files=no` must be empty, `git diff --quiet --exit-code` must succeed, and `git diff --cached --quiet --exit-code` must succeed.
   - Focus on runtime behavior exercised by the installed library, not source-build/package metadata.
   - Treat these downstream apps as the concrete behavior gate for runtime compatibility:
     - `giflib-tools`: text dump and general decode path
@@ -567,7 +703,7 @@ The generated workflow derived from this plan must obey all of the following:
   - If a runtime fix touches hot-path code, keep `safe/tests/perf_compare.sh` passing.
 - `Verification`:
   - `check_03_runtime_matrix` is the required runtime gate.
-  - A runtime fix is incomplete if it only makes Docker pass but does not leave behind a local reproducible regression or if it regresses the original-vs-safe performance gate.
+  - A runtime fix is incomplete if it only makes Docker pass but does not leave behind a local reproducible regression, if `--scope runtime` still executes any source markers, or if it regresses the original-vs-safe performance gate.
 
 ### Phase 4
 
@@ -580,6 +716,13 @@ The generated workflow derived from this plan must obey all of the following:
     - purpose: software-tester execution of the source-build dependent Docker subset plus package-surface and local compatibility checks most likely to catch header/export/pkg-config regressions.
     - commands:
       ```bash
+      if [ -n "$(git status --short --untracked-files=no)" ]; then
+        git status --short --untracked-files=no >&2
+        echo 'tracked worktree must be clean before verification' >&2
+        exit 1
+      fi
+      git diff --quiet --exit-code
+      git diff --cached --quiet --exit-code
       cargo build --manifest-path safe/Cargo.toml --release
       if rg -n 'cc::Build|legacy backend|gif_legacy|\.\./original/.*\.c' safe/build.rs safe/Cargo.toml safe/src; then
         echo 'production build reintroduced original C sources' >&2
@@ -682,12 +825,49 @@ The generated workflow derived from this plan must obey all of the following:
           sys.exit(1)
       PY
       bash -o pipefail -c './test-original.sh --scope source | tee /tmp/test-source.log'
-      grep -F '==> gdal (source)' /tmp/test-source.log
-      grep -F '==> exactimage (source)' /tmp/test-source.log
-      grep -F '==> sail (source)' /tmp/test-source.log
-      grep -F '==> libwebp (source)' /tmp/test-source.log
-      grep -F '==> imlib2 (source)' /tmp/test-source.log
-      grep -F 'All downstream checks passed' /tmp/test-source.log
+      python3 - <<'PY'
+      from pathlib import Path
+      import sys
+
+      log = Path('/tmp/test-source.log').read_text(encoding='utf-8')
+      required = [
+          '==> Building safe Debian packages',
+          '==> Installing safe Debian packages',
+          '==> Verifying runtime linkage to active packaged giflib',
+          '==> gdal (source)',
+          '==> exactimage (source)',
+          '==> sail (source)',
+          '==> libwebp (source)',
+          '==> imlib2 (source)',
+          'All downstream checks passed',
+      ]
+      forbidden = [
+          '==> giflib-tools',
+          '==> webp',
+          '==> fbi',
+          '==> mtpaint',
+          '==> tracker-extract',
+          '==> libextractor-plugin-gif',
+          '==> libcamlimages-ocaml',
+          '==> libgdal34t64',
+      ]
+
+      missing = [marker for marker in required if marker not in log]
+      unexpected = [marker for marker in forbidden if marker in log]
+      count_errors = [
+          marker for marker in required[:3]
+          if log.count(marker) != 1
+      ]
+
+      if missing or unexpected or count_errors:
+          if missing:
+              print('missing source-scope markers:', *missing, sep='\n', file=sys.stderr)
+          if unexpected:
+              print('unexpected runtime-app markers during source scope:', *unexpected, sep='\n', file=sys.stderr)
+          if count_errors:
+              print('shared setup markers must appear exactly once during source scope:', *count_errors, sep='\n', file=sys.stderr)
+          sys.exit(1)
+      PY
       ```
   - `check_04_source_review`
     - type: `check`
@@ -695,7 +875,14 @@ The generated workflow derived from this plan must obey all of the following:
     - purpose: senior-tester review of source-build/package-surface fixes and their regression coverage.
     - commands or review checks:
       ```bash
-      git show --stat --name-only --format=fuller HEAD
+      if [ -n "$(git status --short --untracked-files=no)" ]; then
+        git status --short --untracked-files=no >&2
+        echo 'tracked worktree must be clean before verification' >&2
+        exit 1
+      fi
+      git diff --quiet --exit-code
+      git diff --cached --quiet --exit-code
+      git show --stat --name-only --format=fuller HEAD^..HEAD
       rg -n 'pkg-config|libgif7\.pc|libgif\.pc|libgif\.so|libgif\.a|symbols|--scope source' safe/debian test-original.sh safe/tests/Makefile safe/tests/compat
       find safe/tests/compat -maxdepth 2 -type f | LC_ALL=C sort
       rg -n 'catch_panic_or|catch_error_or|catch_gif_error_or|catch_gif_and_error_or' safe/src
@@ -732,6 +919,8 @@ The generated workflow derived from this plan must obey all of the following:
   - create or update issue-specific reproducers under `safe/tests/compat/`
   - update `test-original.sh` only if source-scope orchestration itself needs refinement
 - `Implementation Details`:
+  - Before yielding, create exactly one non-merge git commit for this phase, with a subject that starts with `impl_04_source_dependents:`.
+  - After that commit, leave the tracked worktree and index clean before yielding: `git status --short --untracked-files=no` must be empty, `git diff --quiet --exit-code` must succeed, and `git diff --cached --quiet --exit-code` must succeed.
   - Focus on compile/link/install surface compatibility:
     - extracted package contents
     - `pkg-config` behavior
@@ -754,7 +943,7 @@ The generated workflow derived from this plan must obey all of the following:
   - Preserve the library-only package set and the `+safelibs` version suffix.
 - `Verification`:
   - `check_04_source_matrix` is the required source-build gate.
-  - Source-build fixes are incomplete if they make Docker pass but leave no local reproducer for the underlying problem class, fail the extracted-package assertions, or regress the original-vs-safe performance gate.
+  - Source-build fixes are incomplete if they make Docker pass but leave no local reproducer for the underlying problem class, if `--scope source` still executes any runtime-app markers, if they fail the extracted-package assertions, or if they regress the original-vs-safe performance gate.
 
 ### Phase 5
 
@@ -767,6 +956,13 @@ The generated workflow derived from this plan must obey all of the following:
     - purpose: software-tester verification that all discovered issues now have local regressions and that the full local/package/performance matrix is stable before the last Docker pass.
     - commands:
       ```bash
+      if [ -n "$(git status --short --untracked-files=no)" ]; then
+        git status --short --untracked-files=no >&2
+        echo 'tracked worktree must be clean before verification' >&2
+        exit 1
+      fi
+      git diff --quiet --exit-code
+      git diff --cached --quiet --exit-code
       cargo build --manifest-path safe/Cargo.toml --release
       if rg -n 'cc::Build|legacy backend|gif_legacy|\.\./original/.*\.c' safe/build.rs safe/Cargo.toml safe/src; then
         echo 'production build reintroduced original C sources' >&2
@@ -878,7 +1074,14 @@ The generated workflow derived from this plan must obey all of the following:
     - purpose: senior-tester review of the final catch-all fix set, with emphasis on regression completeness, minimality, and safety boundaries.
     - commands or review checks:
       ```bash
-      git show --stat --name-only --format=fuller HEAD
+      if [ -n "$(git status --short --untracked-files=no)" ]; then
+        git status --short --untracked-files=no >&2
+        echo 'tracked worktree must be clean before verification' >&2
+        exit 1
+      fi
+      git diff --quiet --exit-code
+      git diff --cached --quiet --exit-code
+      git show --stat --name-only --format=fuller HEAD^..HEAD
       find safe/tests/compat -maxdepth 2 -type f | LC_ALL=C sort
       rg -n '^compat-regress:' safe/tests/Makefile
       rg -n 'SAFETY:' safe/src
@@ -894,6 +1097,13 @@ The generated workflow derived from this plan must obey all of the following:
     - purpose: final software-tester gate across the complete local, package, performance, and downstream-replacement matrix.
     - commands:
       ```bash
+      if [ -n "$(git status --short --untracked-files=no)" ]; then
+        git status --short --untracked-files=no >&2
+        echo 'tracked worktree must be clean before verification' >&2
+        exit 1
+      fi
+      git diff --quiet --exit-code
+      git diff --cached --quiet --exit-code
       cargo build --manifest-path safe/Cargo.toml --release
       if rg -n 'cc::Build|legacy backend|gif_legacy|\.\./original/.*\.c' safe/build.rs safe/Cargo.toml safe/src; then
         echo 'production build reintroduced original C sources' >&2
@@ -973,7 +1183,49 @@ The generated workflow derived from this plan must obey all of the following:
       /tmp/public_api_regress.pkg legacy | diff -u original/tests/legacy.summary -
       /tmp/public_api_regress.pkg alloc | diff -u original/tests/alloc.summary -
       bash -o pipefail -c './test-original.sh --scope all | tee /tmp/test-all.log'
-      grep -F 'All downstream checks passed' /tmp/test-all.log
+      python3 - <<'PY'
+      from pathlib import Path
+      import sys
+
+      log = Path('/tmp/test-all.log').read_text(encoding='utf-8')
+      shared = [
+          '==> Building safe Debian packages',
+          '==> Installing safe Debian packages',
+          '==> Verifying runtime linkage to active packaged giflib',
+      ]
+      runtime = [
+          '==> giflib-tools',
+          '==> webp',
+          '==> fbi',
+          '==> mtpaint',
+          '==> tracker-extract',
+          '==> libextractor-plugin-gif',
+          '==> libcamlimages-ocaml',
+          '==> libgdal34t64',
+      ]
+      source = [
+          '==> gdal (source)',
+          '==> exactimage (source)',
+          '==> sail (source)',
+          '==> libwebp (source)',
+          '==> imlib2 (source)',
+      ]
+      required = shared + runtime + source + ['All downstream checks passed']
+
+      missing = [marker for marker in required if marker not in log]
+      count_errors = [marker for marker in shared if log.count(marker) != 1]
+
+      if missing or count_errors:
+          if missing:
+              print('missing all-scope markers:', *missing, sep='\n', file=sys.stderr)
+          if count_errors:
+              print('shared setup markers must appear exactly once during all scope:', *count_errors, sep='\n', file=sys.stderr)
+          sys.exit(1)
+
+      if max(log.index(marker) for marker in runtime) >= min(log.index(marker) for marker in source):
+          print('runtime markers must complete before source markers begin during all scope', file=sys.stderr)
+          sys.exit(1)
+      PY
       original_build_dir="$(mktemp -d)"
       trap 'rm -rf "$original_build_dir"' EXIT
       cp -a original/. "$original_build_dir"
@@ -1005,6 +1257,8 @@ The generated workflow derived from this plan must obey all of the following:
   - update `safe/debian/*` only if package-surface fixes remain
   - update `test-original.sh` only if final scope orchestration or logging still needs cleanup
 - `Implementation Details`:
+  - Before yielding, create exactly one non-merge git commit for this phase, with a subject that starts with `impl_05_regression_catchall:`.
+  - After that commit, leave the tracked worktree and index clean before yielding: `git status --short --untracked-files=no` must be empty, `git diff --quiet --exit-code` must succeed, and `git diff --cached --quiet --exit-code` must succeed.
   - This is the catch-all phase and the only bounce target for the final full-matrix verifier.
   - Do not open new fronts here. Only fix issues proven by earlier checks or by `check_05_final_full`.
   - Every remaining issue must leave behind a local regression in `safe/tests/compat/` or an existing deterministic target in `safe/tests/Makefile`.
@@ -1013,7 +1267,7 @@ The generated workflow derived from this plan must obey all of the following:
   - Keep panic fencing and `SAFETY:` comments intact while resolving final bugs.
 - `Verification`:
   - `check_05_regression_matrix` must pass before the final full Docker run.
-  - `check_05_final_full` is the terminal blocker for the entire workflow.
+  - `check_05_final_full` is the terminal blocker for the entire workflow, and it must prove that `--scope all` runs the shared setup once, executes runtime markers before source markers, and covers both dependent classes completely.
 
 ## 4. Critical Files
 
@@ -1066,8 +1320,15 @@ The generated workflow derived from this plan must obey all of the following:
 
 After all implementation phases complete, verify the finished port with this end-to-end sequence:
 
-1. Confirm the production library build is still Rust-only and the public header still matches:
+1. Confirm the tracked worktree is clean, the production library build is still Rust-only, and the public header still matches:
    ```bash
+   if [ -n "$(git status --short --untracked-files=no)" ]; then
+     git status --short --untracked-files=no >&2
+     echo 'tracked worktree must be clean before final verification' >&2
+     exit 1
+   fi
+   git diff --quiet --exit-code
+   git diff --cached --quiet --exit-code
    cargo build --manifest-path safe/Cargo.toml --release
    if rg -n 'cc::Build|legacy backend|gif_legacy|\.\./original/.*\.c' safe/build.rs safe/Cargo.toml safe/src; then
      echo 'production build reintroduced original C sources' >&2
@@ -1177,7 +1438,49 @@ After all implementation phases complete, verify the finished port with this end
 6. Run the complete downstream replacement matrix through the scoped Docker harness:
    ```bash
    bash -o pipefail -c './test-original.sh --scope all | tee /tmp/test-all.log'
-   grep -F 'All downstream checks passed' /tmp/test-all.log
+   python3 - <<'PY'
+   from pathlib import Path
+   import sys
+
+   log = Path('/tmp/test-all.log').read_text(encoding='utf-8')
+   shared = [
+       '==> Building safe Debian packages',
+       '==> Installing safe Debian packages',
+       '==> Verifying runtime linkage to active packaged giflib',
+   ]
+   runtime = [
+       '==> giflib-tools',
+       '==> webp',
+       '==> fbi',
+       '==> mtpaint',
+       '==> tracker-extract',
+       '==> libextractor-plugin-gif',
+       '==> libcamlimages-ocaml',
+       '==> libgdal34t64',
+   ]
+   source = [
+       '==> gdal (source)',
+       '==> exactimage (source)',
+       '==> sail (source)',
+       '==> libwebp (source)',
+       '==> imlib2 (source)',
+   ]
+   required = shared + runtime + source + ['All downstream checks passed']
+
+   missing = [marker for marker in required if marker not in log]
+   count_errors = [marker for marker in shared if log.count(marker) != 1]
+
+   if missing or count_errors:
+       if missing:
+           print('missing all-scope markers:', *missing, sep='\n', file=sys.stderr)
+       if count_errors:
+           print('shared setup markers must appear exactly once during all scope:', *count_errors, sep='\n', file=sys.stderr)
+       sys.exit(1)
+
+   if max(log.index(marker) for marker in runtime) >= min(log.index(marker) for marker in source):
+       print('runtime markers must complete before source markers begin during all scope', file=sys.stderr)
+       sys.exit(1)
+   PY
    ```
 
 7. Run the final `unsafe` audit:
