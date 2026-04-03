@@ -1,0 +1,13 @@
+cve-2005-2974-partial-treescap.gif
+derived_from: original/pic/treescap.gif
+purpose: Exercise the partial-image cleanup path described by CVE-2005-2974.
+changes:
+- Truncated the file after byte offset 0x009f, keeping the first 160 bytes only.
+- Removed the original trailing byte range 0x00a0-0x0196 inclusive so the image descriptor stays intact but the LZW image data ends mid-image.
+
+cve-2019-15133-zero-height-treescap.gif
+derived_from: original/pic/treescap.gif
+purpose: Exercise the zero-image-dimension rejection described by CVE-2019-15133.
+changes:
+- Overwrote image descriptor height bytes at offsets 0x0044-0x0045 from `28 00` to `00 00`.
+- Kept the rest of the file byte-for-byte identical to the original fixture.

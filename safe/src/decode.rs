@@ -239,6 +239,12 @@ unsafe fn get_word_impl(GifFile: *mut GifFileType, Word: *mut i32) -> i32 {
     GIF_OK
 }
 
+fn checked_image_pixel_count_u64(width: i32, height: i32) -> Option<u64> {
+    let width = u64::try_from(width).ok()?;
+    let height = u64::try_from(height).ok()?;
+    width.checked_mul(height)
+}
+
 unsafe fn setup_decompress_impl(GifFile: *mut GifFileType) -> i32 {
     let state = unsafe { require_decoder(GifFile) };
     if state.is_null() {
@@ -711,9 +717,21 @@ pub(crate) unsafe fn get_image_header_impl(GifFile: *mut GifFileType) -> i32 {
         }
     }
 
+    let pixel_count = match checked_image_pixel_count_u64(
+        unsafe { (*GifFile).Image.Width },
+        unsafe { (*GifFile).Image.Height },
+    ) {
+        Some(pixel_count) => pixel_count,
+        None => {
+            unsafe {
+                set_error(GifFile, D_GIF_ERR_DATA_TOO_BIG);
+            }
+            return GIF_ERROR;
+        }
+    };
+
     unsafe {
-        (*state).pixel_count =
-            (i64::from((*GifFile).Image.Width) * i64::from((*GifFile).Image.Height)) as u64;
+        (*state).pixel_count = pixel_count;
     }
 
     unsafe { setup_decompress_impl(GifFile) }
@@ -734,9 +752,19 @@ pub(crate) unsafe fn get_image_desc_impl(GifFile: *mut GifFileType) -> i32 {
         return GIF_ERROR;
     }
 
+    let next_image_count = match unsafe { (*GifFile).ImageCount.checked_add(1) } {
+        Some(count) => count,
+        None => {
+            unsafe {
+                set_error(GifFile, D_GIF_ERR_NOT_ENOUGH_MEM);
+            }
+            return GIF_ERROR;
+        }
+    };
+
     unsafe {
         if !(*GifFile).SavedImages.is_null() {
-            let new_count = match usize::try_from((*GifFile).ImageCount.saturating_add(1)) {
+            let new_count = match usize::try_from(next_image_count) {
                 Ok(count) => count,
                 Err(_) => {
                     set_error(GifFile, D_GIF_ERR_NOT_ENOUGH_MEM);
@@ -783,7 +811,7 @@ pub(crate) unsafe fn get_image_desc_impl(GifFile: *mut GifFileType) -> i32 {
         (*saved).RasterBits = ptr::null_mut();
         (*saved).ExtensionBlockCount = 0;
         (*saved).ExtensionBlocks = ptr::null_mut();
-        (*GifFile).ImageCount += 1;
+        (*GifFile).ImageCount = next_image_count;
     }
 
     GIF_OK
@@ -855,16 +883,35 @@ pub(crate) unsafe fn get_line_impl(
         return GIF_ERROR;
     }
 
+    if Line.is_null() {
+        unsafe {
+            set_error(GifFile, D_GIF_ERR_IMAGE_DEFECT);
+        }
+        return GIF_ERROR;
+    }
+
     if LineLen == 0 {
         LineLen = unsafe { (*GifFile).Image.Width };
     }
 
-    unsafe {
-        (*state).pixel_count = (*state).pixel_count.wrapping_sub(LineLen as u32 as u64);
-        if (*state).pixel_count > 0xffff0000 {
-            set_error(GifFile, D_GIF_ERR_DATA_TOO_BIG);
+    let line_len = match u64::try_from(LineLen) {
+        Ok(line_len) => line_len,
+        Err(_) => {
+            unsafe {
+                set_error(GifFile, D_GIF_ERR_DATA_TOO_BIG);
+            }
             return GIF_ERROR;
         }
+    };
+
+    unsafe {
+        (*state).pixel_count = match (*state).pixel_count.checked_sub(line_len) {
+            Some(pixel_count) => pixel_count,
+            None => {
+                set_error(GifFile, D_GIF_ERR_DATA_TOO_BIG);
+                return GIF_ERROR;
+            }
+        };
     }
 
     if unsafe { decompress_line_impl(GifFile, Line, LineLen) } == GIF_OK {
@@ -903,11 +950,13 @@ unsafe fn get_pixel_impl(GifFile: *mut GifFileType, Pixel: GifPixelType) -> i32 
     }
 
     unsafe {
-        (*state).pixel_count = (*state).pixel_count.wrapping_sub(1);
-        if (*state).pixel_count > 0xffff0000 {
-            set_error(GifFile, D_GIF_ERR_DATA_TOO_BIG);
-            return GIF_ERROR;
-        }
+        (*state).pixel_count = match (*state).pixel_count.checked_sub(1) {
+            Some(pixel_count) => pixel_count,
+            None => {
+                set_error(GifFile, D_GIF_ERR_DATA_TOO_BIG);
+                return GIF_ERROR;
+            }
+        };
     }
 
     let mut pixel = Pixel;

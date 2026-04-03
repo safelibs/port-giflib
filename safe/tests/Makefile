@@ -30,12 +30,17 @@ LINK_COMPAT_OBJ = ./public_api_regress.link-compat.o
 LINK_COMPAT_STATIC = ./public_api_regress.link-compat-static
 LINK_COMPAT_SHARED = ./public_api_regress.link-compat-shared
 INTERNAL_EXPORT_SMOKE = ./internal_exports_smoke
+MALFORMED_DIR = ./malformed
+MALFORMED_FIXTURES := $(sort $(wildcard $(MALFORMED_DIR)/*.gif))
+MALFORMED_BASELINE = $(MALFORMED_DIR)/original-baseline.txt
+MALFORMED_OBSERVE = ./malformed_observe
+MALFORMED_CAPTURE = ./capture_malformed_baseline.sh
 
 .PHONY: test clean safe-header-regress link-compat-regress internal-export-regress \
 	legacy-regress fileio-regress alloc-regress render-regress gif2rgb-regress \
 	gifbuild-regress gifclrmp-regress gifecho-regress giffilter-regress \
 	giffix-regress gifsponge-regress drawing-regress giftext-regress \
-	giftool-regress gifwedge-regress malformed-regress
+	giftool-regress gifwedge-regress malformed-regress malformed-baseline-regress
 
 test: $(APITEST) \
 	render-regress \
@@ -51,7 +56,9 @@ test: $(APITEST) \
 	drawing-regress \
 	giftext-regress \
 	giftool-regress \
-	gifwedge-regress
+	gifwedge-regress \
+	malformed-regress \
+	malformed-baseline-regress
 	@echo "No output is good news"
 
 $(APITEST): $(APITEST_SRC) $(LIBGIF_STATIC) $(SAFE_HEADER)
@@ -174,7 +181,21 @@ gifwedge-regress: $(APITEST)
 
 malformed-regress: $(APITEST)
 	@echo "public api: Checking malformed input rejection."
-	@head --bytes=-1 <$(PICS)/treescap.gif | $(APITEST) malformed -
+	@for test in $(MALFORMED_FIXTURES); \
+	do \
+		echo "malformed: rejecting $${test}" >&2; \
+		$(APITEST) malformed $${test}; \
+	done
+
+$(MALFORMED_OBSERVE): ./malformed_observe.c $(LIBGIF_STATIC) $(SAFE_HEADER)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -std=gnu99 -Wall -Wextra -I$(LIBGIF_INCLUDEDIR) \
+		$< $(LIBGIF_STATIC) $(LDLIBS) -o $@
+
+malformed-baseline-regress: $(MALFORMED_OBSERVE) $(MALFORMED_BASELINE) $(MALFORMED_CAPTURE)
+	@echo "public api: Checking malformed observation baseline."
+	@$(MALFORMED_CAPTURE) $(MALFORMED_OBSERVE) $(MALFORMED_DIR) > $@.regress
+	@diff -u $(MALFORMED_BASELINE) $@.regress
+	@rm -f $@.regress
 
 link-compat-regress:
 	$(RM) $(LINK_COMPAT_OBJ) $(LINK_COMPAT_STATIC) $(LINK_COMPAT_SHARED)
@@ -205,4 +226,4 @@ internal-export-regress: $(INTERNAL_EXPORT_SMOKE)
 
 clean:
 	rm -f $(APITEST) $(LINK_COMPAT_OBJ) $(LINK_COMPAT_STATIC) $(LINK_COMPAT_SHARED) \
-		$(INTERNAL_EXPORT_SMOKE) *.actual *.expected *.regress
+		$(INTERNAL_EXPORT_SMOKE) $(MALFORMED_OBSERVE) *.actual *.expected *.regress

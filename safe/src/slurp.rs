@@ -9,14 +9,47 @@ use crate::decode::{
     get_record_type_impl, set_error,
 };
 use crate::ffi::{
-    GifByteType, GifFileType, D_GIF_ERR_NO_IMAG_DSCR, EXTENSION_RECORD_TYPE, GIF_ERROR, GIF_OK,
-    IMAGE_DESC_RECORD_TYPE, TERMINATE_RECORD_TYPE,
+    GifByteType, GifFileType, SavedImage, D_GIF_ERR_IMAGE_DEFECT, D_GIF_ERR_NO_IMAG_DSCR,
+    EXTENSION_RECORD_TYPE, GIF_ERROR, GIF_OK, IMAGE_DESC_RECORD_TYPE, TERMINATE_RECORD_TYPE,
 };
 use crate::helpers::{FreeLastSavedImage, GifAddExtensionBlock};
 use crate::memory::{alloc_array, realloc_array};
 
 const INTERLACED_OFFSET: [i32; 4] = [0, 4, 2, 1];
 const INTERLACED_JUMPS: [i32; 4] = [8, 8, 4, 2];
+
+fn checked_positive_usize(value: i32) -> Option<usize> {
+    usize::try_from(value).ok().filter(|count| *count > 0)
+}
+
+fn checked_image_size(width: i32, height: i32) -> Option<usize> {
+    checked_positive_usize(width)?.checked_mul(checked_positive_usize(height)?)
+}
+
+fn checked_raster_offset(row: i32, width: i32) -> Option<usize> {
+    usize::try_from(row).ok()?.checked_mul(usize::try_from(width).ok()?)
+}
+
+unsafe fn current_saved_image_impl(GifFile: *mut GifFileType) -> *mut SavedImage {
+    if GifFile.is_null() || unsafe { (*GifFile).SavedImages.is_null() } {
+        unsafe {
+            set_error(GifFile, D_GIF_ERR_IMAGE_DEFECT);
+        }
+        return ptr::null_mut();
+    }
+
+    let image_count = match unsafe { usize::try_from((*GifFile).ImageCount) } {
+        Ok(image_count) if image_count > 0 => image_count,
+        _ => {
+            unsafe {
+                set_error(GifFile, D_GIF_ERR_IMAGE_DEFECT);
+            }
+            return ptr::null_mut();
+        }
+    };
+
+    unsafe { (*GifFile).SavedImages.add(image_count - 1) }
+}
 
 unsafe fn decrease_image_counter_impl(GifFile: *mut GifFileType) {
     if GifFile.is_null()
@@ -63,30 +96,22 @@ unsafe fn slurp_impl(GifFile: *mut GifFileType) -> i32 {
                     return GIF_ERROR;
                 }
 
-                let saved = (*GifFile)
-                    .SavedImages
-                    .add((*GifFile).ImageCount as usize - 1);
-                let width = (*saved).ImageDesc.Width;
-                let height = (*saved).ImageDesc.Height;
-                if width <= 0 || height <= 0 || width > i32::MAX / height {
-                    decrease_image_counter_impl(GifFile);
+                let saved = current_saved_image_impl(GifFile);
+                if saved.is_null() {
                     return GIF_ERROR;
                 }
+                let width = (*saved).ImageDesc.Width;
+                let height = (*saved).ImageDesc.Height;
+                let image_size = match checked_image_size(width, height) {
+                    Some(image_size) => image_size,
+                    None => {
+                        decrease_image_counter_impl(GifFile);
+                        return GIF_ERROR;
+                    }
+                };
 
-                let image_size = match usize::try_from(width) {
-                    Ok(width) => match usize::try_from(height) {
-                        Ok(height) => match width.checked_mul(height) {
-                            Some(size) => size,
-                            None => {
-                                decrease_image_counter_impl(GifFile);
-                                return GIF_ERROR;
-                            }
-                        },
-                        Err(_) => {
-                            decrease_image_counter_impl(GifFile);
-                            return GIF_ERROR;
-                        }
-                    },
+                let image_size_i32 = match i32::try_from(image_size) {
+                    Ok(image_size_i32) => image_size_i32,
                     Err(_) => {
                         decrease_image_counter_impl(GifFile);
                         return GIF_ERROR;
@@ -108,9 +133,16 @@ unsafe fn slurp_impl(GifFile: *mut GifFileType) -> i32 {
                     for pass in 0..INTERLACED_OFFSET.len() {
                         let mut row = INTERLACED_OFFSET[pass];
                         while row < height {
+                            let offset = match checked_raster_offset(row, width) {
+                                Some(offset) => offset,
+                                None => {
+                                    decrease_image_counter_impl(GifFile);
+                                    return GIF_ERROR;
+                                }
+                            };
                             if get_line_impl(
                                 GifFile,
-                                (*saved).RasterBits.add((row as usize) * (width as usize)),
+                                (*saved).RasterBits.add(offset),
                                 width,
                             ) == GIF_ERROR
                             {
@@ -120,9 +152,7 @@ unsafe fn slurp_impl(GifFile: *mut GifFileType) -> i32 {
                             row += INTERLACED_JUMPS[pass];
                         }
                     }
-                } else if get_line_impl(GifFile, (*saved).RasterBits, image_size as i32)
-                    == GIF_ERROR
-                {
+                } else if get_line_impl(GifFile, (*saved).RasterBits, image_size_i32) == GIF_ERROR {
                     decrease_image_counter_impl(GifFile);
                     return GIF_ERROR;
                 }

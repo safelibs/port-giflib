@@ -1,0 +1,2 @@
+cve-2005-2974-partial-treescap.gif	1	0	0	102	1	0
+cve-2019-15133-zero-height-treescap.gif	1	0	0	0	1	0
