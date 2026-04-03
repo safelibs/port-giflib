@@ -1,0 +1,9 @@
+/.debhelper/
+/cargo-target/
+/debhelper-build-stamp
+/files
+/libgif-dev/
+/libgif-dev.substvars
+/libgif7/
+/libgif7.substvars
+/tmp/
