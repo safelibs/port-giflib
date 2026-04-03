@@ -66,6 +66,8 @@ static void copy_extension_blocks(int source_count,
                                   ExtensionBlock **target_blocks);
 static Buffer highlevel_copy(const Buffer *input, bool set_interlace,
                              bool interlace_value);
+static Buffer rgb_to_gif(const Buffer *input, int exp_num_colors,
+                         int width, int height);
 static Buffer generate_foobar(void);
 static Buffer generate_wedge(void);
 static bool malformed_input_is_rejected(const Buffer *input);
@@ -77,7 +79,7 @@ static void usage(void) {
 	fprintf(stderr,
 	        "usage: public_api_regress "
 	        "{render|map|dump|icon|lowlevel-copy|repair|highlevel-copy|"
-	        "interlace|generate|malformed} [args]\n");
+	        "interlace|rgb-to-gif|generate|malformed} [args]\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -1550,6 +1552,109 @@ static Buffer highlevel_copy(const Buffer *input, bool set_interlace,
 	return out;
 }
 
+static Buffer rgb_to_gif(const Buffer *input, int exp_num_colors,
+                         int width, int height) {
+	Buffer out = {0};
+	GifFileType *gif;
+	ColorMapObject *output_color_map = NULL;
+	GifByteType *red_buffer = NULL;
+	GifByteType *green_buffer = NULL;
+	GifByteType *blue_buffer = NULL;
+	GifByteType *output_buffer = NULL;
+	size_t pixel_count;
+	int color_map_size;
+	int error_code = 0;
+	int i;
+
+	if (exp_num_colors <= 0 || exp_num_colors > 8 || width <= 0 ||
+	    height <= 0) {
+		fatal("invalid rgb-to-gif dimensions or color count");
+	}
+
+	pixel_count = (size_t)width * (size_t)height;
+	if (input->len != pixel_count * 3) {
+		fatal("expected %zu bytes of RGB input, got %zu",
+		      pixel_count * 3, input->len);
+	}
+
+	color_map_size = 1 << exp_num_colors;
+	red_buffer = xmalloc(pixel_count);
+	green_buffer = xmalloc(pixel_count);
+	blue_buffer = xmalloc(pixel_count);
+	output_buffer = xmalloc(pixel_count);
+	output_color_map = GifMakeMapObject(color_map_size, NULL);
+	if (output_color_map == NULL) {
+		free(red_buffer);
+		free(green_buffer);
+		free(blue_buffer);
+		free(output_buffer);
+		fatal("GifMakeMapObject failed");
+	}
+
+	for (i = 0; i < width * height; i++) {
+		red_buffer[i] = input->data[i * 3];
+		green_buffer[i] = input->data[i * 3 + 1];
+		blue_buffer[i] = input->data[i * 3 + 2];
+	}
+
+	if (GifQuantizeBuffer((unsigned int)width, (unsigned int)height,
+	                      &color_map_size, red_buffer, green_buffer,
+	                      blue_buffer, output_buffer,
+	                      output_color_map->Colors) == GIF_ERROR) {
+		free(red_buffer);
+		free(green_buffer);
+		free(blue_buffer);
+		free(output_buffer);
+		GifFreeMapObject(output_color_map);
+		fatal("GifQuantizeBuffer failed");
+	}
+	output_color_map->SortFlag = true;
+
+	free(red_buffer);
+	free(green_buffer);
+	free(blue_buffer);
+
+	gif = EGifOpen(&out, memory_write, &error_code);
+	if (gif == NULL) {
+		free(output_buffer);
+		GifFreeMapObject(output_color_map);
+		fatal("EGifOpen failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+	if (EGifPutScreenDesc(gif, width, height, exp_num_colors, 0,
+	                      output_color_map) == GIF_ERROR ||
+	    EGifPutImageDesc(gif, 0, 0, width, height, false, NULL) ==
+	        GIF_ERROR) {
+		free(output_buffer);
+		GifFreeMapObject(output_color_map);
+		(void)EGifCloseFile(gif, NULL);
+		buffer_free(&out);
+		fatal("Failed to start GIF output");
+	}
+
+	for (i = 0; i < height; i++) {
+		if (EGifPutLine(gif, output_buffer + (i * width), width) ==
+		    GIF_ERROR) {
+			free(output_buffer);
+			GifFreeMapObject(output_color_map);
+			(void)EGifCloseFile(gif, NULL);
+			buffer_free(&out);
+			fatal("EGifPutLine failed: %s",
+			      gif_error_string_or_default(gif->Error));
+		}
+	}
+
+	free(output_buffer);
+	GifFreeMapObject(output_color_map);
+	if (EGifCloseFile(gif, &error_code) == GIF_ERROR) {
+		buffer_free(&out);
+		fatal("EGifCloseFile failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+
+	return out;
+}
+
 static Buffer generate_foobar(void) {
 	const char text[] = "foobar";
 	Buffer out = {0};
@@ -1794,6 +1899,20 @@ int main(int argc, char **argv) {
 		}
 		input = read_input(argv[3]);
 		output = highlevel_copy(&input, true, interlace_value);
+		write_stdout(&output);
+	} else if (strcmp(argv[1], "rgb-to-gif") == 0) {
+		int exp_num_colors;
+		int width;
+		int height;
+
+		if (argc < 5) {
+			usage();
+		}
+		exp_num_colors = atoi(argv[2]);
+		width = atoi(argv[3]);
+		height = atoi(argv[4]);
+		input = read_input(argc >= 6 ? argv[5] : "-");
+		output = rgb_to_gif(&input, exp_num_colors, width, height);
 		write_stdout(&output);
 	} else if (strcmp(argv[1], "generate") == 0) {
 		if (argc < 3) {

@@ -36,6 +36,7 @@ test: public_api_regress \
 
 rebuild: public_api_regress \
 	render-rebuild \
+	gif2rgb-rebuild \
 	gifbuild-rebuild \
 	gifclrmp-rebuild \
 	gifecho-rebuild \
@@ -64,6 +65,14 @@ render-rebuild: public_api_regress
 		echo "Remaking $${stem}.rgb"; \
 		$(APITEST) render $${test} > $${stem}.rgb; \
 	done
+
+gif2rgb-regress: public_api_regress
+	@echo "gif2rgb: Checking idempotency through public quantization APIs."
+	@$(APITEST) rgb-to-gif 3 100 100 <gifgrid.rgb | $(APITEST) icon - | diff -u gifgrid.ico -
+
+gif2rgb-rebuild: public_api_regress
+	@echo "Rebuilding gif2rgb checkfile."
+	@$(APITEST) rgb-to-gif 3 100 100 <gifgrid.rgb | $(APITEST) icon - >gifgrid.ico
 
 gifbuild-regress: public_api_regress
 	@echo "gifbuild: Checking structural dump of treescap.gif via public API."
