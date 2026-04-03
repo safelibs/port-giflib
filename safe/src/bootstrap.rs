@@ -1,40 +1,49 @@
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
+use crate::ffi::{GifFileType, InputFunc, OutputFunc};
+
 #[cfg(target_os = "linux")]
 #[link(name = "gif_legacy", kind = "static", modifiers = "+whole-archive")]
 unsafe extern "C" {
-    fn DGifOpen();
-    fn EGifOpen();
-    fn GifMakeMapObject();
-    fn GifErrorString();
-    fn GifDrawText8x8();
-    fn _InitHashTable();
-    fn openbsd_reallocarray();
-    fn GifQuantizeBuffer();
+    fn DGifOpen(
+        user_ptr: *mut core::ffi::c_void,
+        read_func: InputFunc,
+        error: *mut i32,
+    ) -> *mut GifFileType;
+    fn EGifOpen(
+        user_ptr: *mut core::ffi::c_void,
+        write_func: OutputFunc,
+        error: *mut i32,
+    ) -> *mut GifFileType;
 }
 
 #[cfg(not(target_os = "linux"))]
 #[link(name = "gif_legacy", kind = "static")]
 unsafe extern "C" {
-    fn DGifOpen();
+    fn DGifOpen(
+        user_ptr: *mut core::ffi::c_void,
+        read_func: InputFunc,
+        error: *mut i32,
+    ) -> *mut GifFileType;
+    fn EGifOpen(
+        user_ptr: *mut core::ffi::c_void,
+        write_func: OutputFunc,
+        error: *mut i32,
+    ) -> *mut GifFileType;
 }
 
 #[used]
-static LINK_DGIF_OPEN: unsafe extern "C" fn() = DGifOpen;
+static LINK_DGIF_OPEN: unsafe extern "C" fn(
+    *mut core::ffi::c_void,
+    InputFunc,
+    *mut i32,
+) -> *mut GifFileType = DGifOpen;
 #[used]
-static LINK_EGIF_OPEN: unsafe extern "C" fn() = EGifOpen;
-#[used]
-static LINK_GIF_MAKE_MAP_OBJECT: unsafe extern "C" fn() = GifMakeMapObject;
-#[used]
-static LINK_GIF_ERROR_STRING: unsafe extern "C" fn() = GifErrorString;
-#[used]
-static LINK_GIF_DRAW_TEXT_8X8: unsafe extern "C" fn() = GifDrawText8x8;
-#[used]
-static LINK_INIT_HASH_TABLE: unsafe extern "C" fn() = _InitHashTable;
-#[used]
-static LINK_OPENBSD_REALLOCARRAY: unsafe extern "C" fn() = openbsd_reallocarray;
-#[used]
-static LINK_GIF_QUANTIZE_BUFFER: unsafe extern "C" fn() = GifQuantizeBuffer;
+static LINK_EGIF_OPEN: unsafe extern "C" fn(
+    *mut core::ffi::c_void,
+    OutputFunc,
+    *mut i32,
+) -> *mut GifFileType = EGifOpen;
 
 pub(crate) const LEGACY_BACKEND_ENABLED: bool = true;
 

@@ -2,16 +2,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const LEGACY_SOURCES: &[&str] = &[
-    "dgif_lib.c",
-    "egif_lib.c",
-    "gifalloc.c",
-    "gif_err.c",
-    "gif_font.c",
-    "gif_hash.c",
-    "openbsd-reallocarray.c",
-    "quantize.c",
-];
+const LEGACY_SOURCES: &[&str] = &["dgif_lib.c", "egif_lib.c"];
 
 const LEGACY_HEADERS: &[&str] = &["gif_hash.h", "gif_lib.h", "gif_lib_private.h"];
 
