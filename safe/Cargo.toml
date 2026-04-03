@@ -9,5 +9,9 @@ build = "build.rs"
 name = "gif"
 crate-type = ["cdylib", "staticlib"]
 
+[profile.release]
+codegen-units = 1
+lto = "thin"
+
 [dependencies]
 libc = "0.2"

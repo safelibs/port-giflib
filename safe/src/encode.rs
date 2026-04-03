@@ -2,6 +2,7 @@
 
 use core::ffi::{c_char, c_void};
 use core::ptr;
+use core::slice;
 
 use std::ffi::CStr;
 
@@ -497,10 +498,15 @@ unsafe fn put_screen_desc_impl(
         (*GifFile).SHeight = Height;
         (*GifFile).SColorResolution = ColorRes;
         (*GifFile).SBackGroundColor = BackGround;
-        (*GifFile).SColorMap = ptr::null_mut();
     }
 
-    if !ColorMap.is_null() {
+    if unsafe { (*GifFile).SColorMap } != ColorMap.cast_mut() {
+        unsafe {
+            (*GifFile).SColorMap = ptr::null_mut();
+        }
+    }
+
+    if !ColorMap.is_null() && unsafe { (*GifFile).SColorMap.is_null() } {
         let cloned = unsafe { clone_color_map(ColorMap) };
         if cloned.is_null() {
             unsafe {
@@ -687,9 +693,10 @@ unsafe fn put_line_impl(GifFile: *mut GifFileType, Line: *mut GifPixelType, Line
 
     let mask = CODE_MASK[usize::try_from(unsafe { (*state).bits_per_pixel }).unwrap_or(0)];
     let line_len = usize::try_from(line_len).unwrap_or(0);
-    for index in 0..line_len {
-        unsafe {
-            *Line.add(index) &= mask;
+    if mask != 0xff {
+        let pixels = unsafe { slice::from_raw_parts_mut(Line, line_len) };
+        for pixel in pixels {
+            *pixel &= mask;
         }
     }
 

@@ -2,15 +2,16 @@
 
 use crate::bootstrap::catch_panic_or;
 use crate::ffi::{GifByteType, GifColorType, GIF_ERROR, GIF_OK};
-use core::cmp::Ordering;
 
 const COLOR_ARRAY_SIZE: usize = 32768;
 const BITS_PER_PRIM_COLOR: u8 = 5;
 const MAX_PRIM_COLOR: u8 = 0x1f;
+const GREEN_SHIFT: usize = BITS_PER_PRIM_COLOR as usize;
+const RED_SHIFT: usize = 2 * GREEN_SHIFT;
+const COLOR_MASK: usize = MAX_PRIM_COLOR as usize;
 
 #[derive(Clone, Copy)]
 struct QuantizedColorType {
-    RGB: [GifByteType; 3],
     NewColorIndex: GifByteType,
     Count: i64,
     Pnext: Option<usize>,
@@ -19,7 +20,6 @@ struct QuantizedColorType {
 impl Default for QuantizedColorType {
     fn default() -> Self {
         Self {
-            RGB: [0; 3],
             NewColorIndex: 0,
             Count: 0,
             Pnext: None,
@@ -48,10 +48,18 @@ impl Default for NewColorMapType {
     }
 }
 
-fn sort_hash(entry: &QuantizedColorType, axis: usize) -> i32 {
-    i32::from(entry.RGB[axis]) * 256 * 256
-        + i32::from(entry.RGB[(axis + 1) % 3]) * 256
-        + i32::from(entry.RGB[(axis + 2) % 3])
+fn color_component(index: usize, axis: usize) -> GifByteType {
+    match axis {
+        0 => (index >> RED_SHIFT) as GifByteType,
+        1 => ((index >> GREEN_SHIFT) & COLOR_MASK) as GifByteType,
+        _ => (index & COLOR_MASK) as GifByteType,
+    }
+}
+
+fn sort_hash(index: usize, axis: usize) -> usize {
+    usize::from(color_component(index, axis)) * 256 * 256
+        + usize::from(color_component(index, (axis + 1) % 3)) * 256
+        + usize::from(color_component(index, (axis + 2) % 3))
 }
 
 fn link_sorted(entries: &mut [QuantizedColorType], order: &[usize]) -> Option<usize> {
@@ -68,6 +76,7 @@ fn link_sorted(entries: &mut [QuantizedColorType], order: &[usize]) -> Option<us
 fn subdiv_color_map(
     entries: &mut [QuantizedColorType],
     new_color_subdiv: &mut [NewColorMapType; 256],
+    sort_array: &mut Vec<usize>,
     ColorMapSize: usize,
     NewColorMapSize: &mut usize,
 ) -> i32 {
@@ -94,24 +103,14 @@ fn subdiv_color_map(
             return GIF_OK;
         }
 
-        let mut sort_array = Vec::with_capacity(new_color_subdiv[Index].NumEntries);
+        sort_array.clear();
         let mut current = new_color_subdiv[Index].QuantizedColors;
         while let Some(index) = current {
             sort_array.push(index);
             current = entries[index].Pnext;
         }
 
-        sort_array.sort_unstable_by(|left, right| {
-            let hash1 = sort_hash(&entries[*left], SortRGBAxis);
-            let hash2 = sort_hash(&entries[*right], SortRGBAxis);
-            if hash1 < hash2 {
-                Ordering::Less
-            } else if hash1 > hash2 {
-                Ordering::Greater
-            } else {
-                Ordering::Equal
-            }
-        });
+        sort_array.sort_unstable_by_key(|&index| sort_hash(index, SortRGBAxis));
         new_color_subdiv[Index].QuantizedColors = link_sorted(entries, &sort_array);
 
         let mut quantized_color = sort_array[0];
@@ -135,8 +134,8 @@ fn subdiv_color_map(
         };
 
         let MaxColor =
-            u32::from(entries[quantized_color].RGB[SortRGBAxis]) << (8 - BITS_PER_PRIM_COLOR);
-        let MinColor = u32::from(entries[next].RGB[SortRGBAxis]) << (8 - BITS_PER_PRIM_COLOR);
+            u32::from(color_component(quantized_color, SortRGBAxis)) << (8 - BITS_PER_PRIM_COLOR);
+        let MinColor = u32::from(color_component(next, SortRGBAxis)) << (8 - BITS_PER_PRIM_COLOR);
 
         new_color_subdiv[*NewColorMapSize].QuantizedColors = Some(next);
         entries[quantized_color].Pnext = None;
@@ -190,24 +189,17 @@ pub unsafe extern "C" fn GifQuantizeBuffer(
             Ok(size) if size > 0 && size <= 256 => size,
             _ => return GIF_ERROR,
         };
-        let pixel_count = match usize::try_from(u64::from(Width) * u64::from(Height)) {
+        let total_pixels = u64::from(Width) * u64::from(Height);
+        let pixel_count = match usize::try_from(total_pixels) {
             Ok(pixel_count) => pixel_count,
             Err(_) => return GIF_ERROR,
         };
 
         let mut entries = vec![QuantizedColorType::default(); COLOR_ARRAY_SIZE];
-        for (index, entry) in entries.iter_mut().enumerate() {
-            entry.RGB[0] = (index >> (2 * usize::from(BITS_PER_PRIM_COLOR))) as u8;
-            entry.RGB[1] =
-                ((index >> usize::from(BITS_PER_PRIM_COLOR)) & usize::from(MAX_PRIM_COLOR)) as u8;
-            entry.RGB[2] = (index & usize::from(MAX_PRIM_COLOR)) as u8;
-        }
 
         for i in 0..pixel_count {
-            let index = ((usize::from(*RedInput.add(i) >> (8 - BITS_PER_PRIM_COLOR)))
-                << (2 * usize::from(BITS_PER_PRIM_COLOR)))
-                + ((usize::from(*GreenInput.add(i) >> (8 - BITS_PER_PRIM_COLOR)))
-                    << usize::from(BITS_PER_PRIM_COLOR))
+            let index = ((usize::from(*RedInput.add(i) >> (8 - BITS_PER_PRIM_COLOR))) << RED_SHIFT)
+                + ((usize::from(*GreenInput.add(i) >> (8 - BITS_PER_PRIM_COLOR))) << GREEN_SHIFT)
                 + usize::from(*BlueInput.add(i) >> (8 - BITS_PER_PRIM_COLOR));
             entries[index].Count += 1;
         }
@@ -230,12 +222,14 @@ pub unsafe extern "C" fn GifQuantizeBuffer(
         }
         entries[quantized_color].Pnext = None;
         new_color_subdiv[0].NumEntries = num_of_entries;
-        new_color_subdiv[0].Count = u64::from(Width) * u64::from(Height);
+        new_color_subdiv[0].Count = total_pixels;
 
         let mut new_color_map_size = 1usize;
+        let mut sort_array = Vec::with_capacity(COLOR_ARRAY_SIZE);
         if subdiv_color_map(
             &mut entries,
             &mut new_color_subdiv,
+            &mut sort_array,
             requested_color_map_size,
             &mut new_color_map_size,
         ) != GIF_OK
@@ -263,9 +257,9 @@ pub unsafe extern "C" fn GifQuantizeBuffer(
             let mut current = new_color_subdiv[i].QuantizedColors;
             while let Some(index) = current {
                 entries[index].NewColorIndex = i as u8;
-                red += i64::from(entries[index].RGB[0]);
-                green += i64::from(entries[index].RGB[1]);
-                blue += i64::from(entries[index].RGB[2]);
+                red += i64::from(color_component(index, 0));
+                green += i64::from(color_component(index, 1));
+                blue += i64::from(color_component(index, 2));
                 current = entries[index].Pnext;
             }
             (*OutputColorMap.add(i)).Red =
@@ -279,9 +273,8 @@ pub unsafe extern "C" fn GifQuantizeBuffer(
         let mut _MaxRGBError = [0i32; 3];
         for i in 0..pixel_count {
             let sampled_index = ((usize::from(*RedInput.add(i) >> (8 - BITS_PER_PRIM_COLOR)))
-                << (2 * usize::from(BITS_PER_PRIM_COLOR)))
-                + ((usize::from(*GreenInput.add(i) >> (8 - BITS_PER_PRIM_COLOR)))
-                    << usize::from(BITS_PER_PRIM_COLOR))
+                << RED_SHIFT)
+                + ((usize::from(*GreenInput.add(i) >> (8 - BITS_PER_PRIM_COLOR))) << GREEN_SHIFT)
                 + usize::from(*BlueInput.add(i) >> (8 - BITS_PER_PRIM_COLOR));
             let mapped_index = usize::from(entries[sampled_index].NewColorIndex);
             *OutputBuffer.add(i) = mapped_index as u8;
