@@ -22,3 +22,9 @@ original/openbsd-reallocarray.o
 original/qprintf.o
 original/quantize.o
 original/tests/public_api_regress
+safe/target/
+safe/tests/internal_exports_smoke
+safe/tests/public_api_regress
+safe/tests/public_api_regress.link-compat.o
+safe/tests/public_api_regress.link-compat-shared
+safe/tests/public_api_regress.link-compat-static

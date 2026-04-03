@@ -1,0 +1,13 @@
+[package]
+name = "giflib-safe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+build = "build.rs"
+
+[lib]
+name = "gif"
+crate-type = ["cdylib", "staticlib"]
+
+[build-dependencies]
+cc = "1"
