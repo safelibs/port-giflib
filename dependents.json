@@ -1,0 +1,157 @@
+{
+  "ubuntu_release": "24.04.3 LTS (noble)",
+  "observed_on": "2026-04-02",
+  "giflib_runtime_package": "libgif7 5.2.2-1ubuntu1",
+  "giflib_development_package": "libgif-dev 5.2.2-1ubuntu1",
+  "selection_scope": "Non-exhaustive diverse sample of Ubuntu 24.04 repository software that uses giflib at runtime or build time.",
+  "method": [
+    "Selected runtime dependents from Ubuntu package metadata with apt-cache rdepends libgif7.",
+    "Selected compile-time dependents from source package metadata with apt-cache showsrc ... Build-Depends: libgif-dev.",
+    "Summarized runtime functionality from package descriptions, source package metadata, and package file lists."
+  ],
+  "dependents": [
+    {
+      "name": "giflib-tools",
+      "package_kind": "binary",
+      "dependency_path": "runtime",
+      "giflib_package": "libgif7",
+      "runtime_functionality": "The package is itself a set of GIF-oriented command-line tools for building, repairing, inspecting, and converting GIF files.",
+      "evidence": [
+        "Depends: libgif7 (>= 5.1)",
+        "Installs gif2rgb, gifbuild, gifclrmp, giffix, giftext, and giftool."
+      ]
+    },
+    {
+      "name": "webp",
+      "package_kind": "binary",
+      "dependency_path": "runtime",
+      "giflib_package": "libgif7",
+      "runtime_functionality": "Uses giflib for GIF input support in the WebP tool set, most explicitly for the gif2webp converter that turns GIF animations or still GIF images into WebP.",
+      "evidence": [
+        "Depends: libgif7 (>= 5.1)",
+        "Installs /usr/bin/gif2webp."
+      ]
+    },
+    {
+      "name": "fbi",
+      "package_kind": "binary",
+      "dependency_path": "runtime",
+      "giflib_package": "libgif7",
+      "runtime_functionality": "Displays GIF images directly on Linux framebuffer devices.",
+      "evidence": [
+        "Depends: libgif7 (>= 5.1)",
+        "Package description says it is a framebuffer image viewer with built-in support for common image file formats."
+      ]
+    },
+    {
+      "name": "mtpaint",
+      "package_kind": "binary",
+      "dependency_path": "runtime",
+      "giflib_package": "libgif7",
+      "runtime_functionality": "Opens and edits GIF images; the Ubuntu package description explicitly lists GIF among the handled formats.",
+      "evidence": [
+        "Depends: libgif7 (>= 5.1)",
+        "Package description: it can handle JPEG, GIF, TIFF, BMP, XPM, and XBM files."
+      ]
+    },
+    {
+      "name": "tracker-extract",
+      "package_kind": "binary",
+      "dependency_path": "runtime",
+      "giflib_package": "libgif7",
+      "runtime_functionality": "Reads GIF files during desktop indexing so Tracker can extract metadata and image properties for search.",
+      "evidence": [
+        "Depends: libgif7 (>= 5.1)",
+        "tracker-miners source package Build-Depends on libgif-dev."
+      ]
+    },
+    {
+      "name": "libextractor-plugin-gif",
+      "package_kind": "binary",
+      "dependency_path": "runtime",
+      "giflib_package": "libgif7",
+      "runtime_functionality": "Extracts metadata from GIF files for applications that use GNU libextractor.",
+      "evidence": [
+        "Depends: libgif7 (>= 5.1)",
+        "Package description explicitly says it is the GIF plugin."
+      ]
+    },
+    {
+      "name": "libcamlimages-ocaml",
+      "package_kind": "binary",
+      "dependency_path": "runtime",
+      "giflib_package": "libgif7",
+      "runtime_functionality": "Lets OCaml programs load, save, display, and translate GIF images through CamlImages.",
+      "evidence": [
+        "Depends: libgif7 (>= 5.1)",
+        "Package description says the library provides image processing plus loading and saving of various image formats."
+      ]
+    },
+    {
+      "name": "libgdal34t64",
+      "package_kind": "binary",
+      "dependency_path": "runtime",
+      "giflib_package": "libgif7",
+      "runtime_functionality": "Provides GIF raster format handling inside GDAL-based GIS applications and format-conversion workflows.",
+      "evidence": [
+        "Depends: libgif7 (>= 5.1)",
+        "gdal source package Build-Depends on libgif-dev."
+      ]
+    },
+    {
+      "name": "gdal",
+      "package_kind": "source",
+      "dependency_path": "compile-time",
+      "giflib_package": "libgif-dev",
+      "runtime_functionality": "Builds GIF raster support into libgdal34t64, gdal-bin, gdal-plugins, and python3-gdal.",
+      "evidence": [
+        "Build-Depends: libgif-dev",
+        "Produces libgdal34t64, libgdal-dev, gdal-bin, gdal-data, gdal-plugins, and python3-gdal."
+      ]
+    },
+    {
+      "name": "exactimage",
+      "package_kind": "source",
+      "dependency_path": "compile-time",
+      "giflib_package": "libgif-dev",
+      "runtime_functionality": "Builds GIF decoding and encoding support into the ExactImage utilities and its Perl and Python bindings.",
+      "evidence": [
+        "Build-Depends: libgif-dev",
+        "Produces exactimage, libexactimage-perl, and python3-exactimage."
+      ]
+    },
+    {
+      "name": "sail",
+      "package_kind": "source",
+      "dependency_path": "compile-time",
+      "giflib_package": "libgif-dev",
+      "runtime_functionality": "Builds the GIF codec shipped in sail-codecs for image decoding and encoding.",
+      "evidence": [
+        "Build-Depends: libgif-dev",
+        "Produces sail-codecs."
+      ]
+    },
+    {
+      "name": "libwebp",
+      "package_kind": "source",
+      "dependency_path": "compile-time",
+      "giflib_package": "libgif-dev",
+      "runtime_functionality": "Builds GIF input support into the WebP tool set, especially the gif2webp converter.",
+      "evidence": [
+        "Build-Depends: libgif-dev",
+        "Produces the webp binary package, which installs /usr/bin/gif2webp."
+      ]
+    },
+    {
+      "name": "imlib2",
+      "package_kind": "source",
+      "dependency_path": "compile-time",
+      "giflib_package": "libgif-dev",
+      "runtime_functionality": "Builds GIF image loading and saving support into Imlib2, which downstream viewers and desktop tools use for GIF handling.",
+      "evidence": [
+        "Build-Depends: libgif-dev",
+        "Produces libimlib2t64 and libimlib2-dev."
+      ]
+    }
+  ]
+}
