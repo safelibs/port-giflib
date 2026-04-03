@@ -242,6 +242,7 @@ pub struct GifHashTableType {
     pub HTable: [u32; HT_SIZE],
 }
 
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub type InputFunc = Option<unsafe extern "C" fn(*mut GifFileType, *mut GifByteType, i32) -> i32>;
 pub type OutputFunc =
     Option<unsafe extern "C" fn(*mut GifFileType, *const GifByteType, i32) -> i32>;

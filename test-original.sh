@@ -72,8 +72,8 @@ RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.s
  && rm -rf /var/lib/apt/lists/*
 
 COPY dependents.json /work/dependents.json
-COPY safe /work/safe
-COPY original /work/original
+COPY \./safe /work/safe/
+COPY \./original /work/original/
 WORKDIR /work
 DOCKERFILE
 

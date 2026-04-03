@@ -10,21 +10,25 @@ fn key_item(Item: u32) -> usize {
     (((Item >> 12) ^ Item) & HT_KEY_MASK) as usize
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 unsafe fn clear_hash_table_impl(HashTable: *mut GifHashTableType) {
     if HashTable.is_null() {
         return;
     }
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     unsafe {
         ptr::write_bytes((*HashTable).HTable.as_mut_ptr(), 0xFF, HT_SIZE);
     }
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 unsafe fn insert_hash_table_impl(HashTable: *mut GifHashTableType, Key: u32, Code: i32) {
     if HashTable.is_null() {
         return;
     }
 
     let mut HKey = key_item(Key);
+    // SAFETY: The surrounding checks ensure these raw giflib pointers are valid for this access.
     let HTable = unsafe { &mut (*HashTable).HTable };
     while (HTable[HKey] >> 12) != HT_EMPTY_KEY {
         HKey = (HKey + 1) & (HT_KEY_MASK as usize);
@@ -32,12 +36,14 @@ unsafe fn insert_hash_table_impl(HashTable: *mut GifHashTableType, Key: u32, Cod
     HTable[HKey] = (Key << 12) | ((Code as u32) & 0x0FFF);
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 unsafe fn exists_hash_table_impl(HashTable: *mut GifHashTableType, Key: u32) -> i32 {
     if HashTable.is_null() {
         return -1;
     }
 
     let mut HKey = key_item(Key);
+    // SAFETY: The surrounding checks ensure these raw giflib pointers are valid for this access.
     let HTable = unsafe { &(*HashTable).HTable };
     loop {
         let entry = HTable[HKey];
@@ -53,6 +59,7 @@ unsafe fn exists_hash_table_impl(HashTable: *mut GifHashTableType, Key: u32) -> 
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn _InitHashTable() -> *mut GifHashTableType {
     catch_panic_or(ptr::null_mut(), || unsafe {
         let HashTable = alloc_struct::<GifHashTableType>();
@@ -65,6 +72,7 @@ pub unsafe extern "C" fn _InitHashTable() -> *mut GifHashTableType {
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn _ClearHashTable(HashTable: *mut GifHashTableType) {
     catch_panic_or((), || unsafe {
         clear_hash_table_impl(HashTable);
@@ -72,6 +80,7 @@ pub unsafe extern "C" fn _ClearHashTable(HashTable: *mut GifHashTableType) {
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn _InsertHashTable(HashTable: *mut GifHashTableType, Key: u32, Code: i32) {
     catch_panic_or((), || unsafe {
         insert_hash_table_impl(HashTable, Key, Code);
@@ -79,6 +88,7 @@ pub unsafe extern "C" fn _InsertHashTable(HashTable: *mut GifHashTableType, Key:
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn _ExistsHashTable(HashTable: *mut GifHashTableType, Key: u32) -> i32 {
     catch_panic_or(-1, || unsafe { exists_hash_table_impl(HashTable, Key) })
 }

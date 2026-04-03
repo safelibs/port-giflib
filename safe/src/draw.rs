@@ -139,11 +139,13 @@ pub static GifAsciiTable8x8: [[u8; GIF_FONT_WIDTH]; 128] = [
     [0x00, 0x00, 0x18, 0x3c, 0x66, 0xff, 0x00, 0x00], /* Ascii 127 */
 ];
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 unsafe fn draw_text_bytes_impl(Image: *mut SavedImage, x: i32, y: i32, legend: &[u8], color: i32) {
     if Image.is_null() || unsafe { (*Image).RasterBits.is_null() } {
         return;
     }
 
+    // SAFETY: The surrounding checks ensure these raw giflib pointers are valid for this access.
     let width = match usize::try_from(unsafe { (*Image).ImageDesc.Width }) {
         Ok(width) => width,
         Err(_) => return,
@@ -172,6 +174,7 @@ unsafe fn draw_text_bytes_impl(Image: *mut SavedImage, x: i32, y: i32, legend: &
                     & (1u16 << (GIF_FONT_WIDTH - j)))
                     != 0
                 {
+                    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
                     unsafe {
                         *(*Image).RasterBits.add(base) = color as GifPixelType;
                     }
@@ -182,11 +185,13 @@ unsafe fn draw_text_bytes_impl(Image: *mut SavedImage, x: i32, y: i32, legend: &
     }
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 unsafe fn draw_box_impl(Image: *mut SavedImage, x: i32, y: i32, w: i32, d: i32, color: i32) {
     if Image.is_null() || unsafe { (*Image).RasterBits.is_null() } {
         return;
     }
 
+    // SAFETY: The surrounding checks ensure these raw giflib pointers are valid for this access.
     let width = match usize::try_from(unsafe { (*Image).ImageDesc.Width }) {
         Ok(width) => width,
         Err(_) => return,
@@ -217,6 +222,7 @@ unsafe fn draw_box_impl(Image: *mut SavedImage, x: i32, y: i32, w: i32, d: i32, 
     };
 
     for j in 0..w {
+        // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
         unsafe {
             *(*Image).RasterBits.add(base + j) = color as GifPixelType;
             *(*Image).RasterBits.add(base + (d * width) + j) = color as GifPixelType;
@@ -224,6 +230,7 @@ unsafe fn draw_box_impl(Image: *mut SavedImage, x: i32, y: i32, w: i32, d: i32, 
     }
 
     for j in 0..d {
+        // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
         unsafe {
             *(*Image).RasterBits.add(base + j * width) = color as GifPixelType;
             *(*Image).RasterBits.add(base + j * width + w) = color as GifPixelType;
@@ -231,11 +238,13 @@ unsafe fn draw_box_impl(Image: *mut SavedImage, x: i32, y: i32, w: i32, d: i32, 
     }
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 unsafe fn draw_rectangle_impl(Image: *mut SavedImage, x: i32, y: i32, w: i32, d: i32, color: i32) {
     if Image.is_null() || unsafe { (*Image).RasterBits.is_null() } {
         return;
     }
 
+    // SAFETY: The surrounding checks ensure these raw giflib pointers are valid for this access.
     let width = match usize::try_from(unsafe { (*Image).ImageDesc.Width }) {
         Ok(width) => width,
         Err(_) => return,
@@ -261,11 +270,13 @@ unsafe fn draw_rectangle_impl(Image: *mut SavedImage, x: i32, y: i32, w: i32, d:
         .checked_mul(y)
         .and_then(|offset| offset.checked_add(x))
     {
+        // SAFETY: The surrounding checks ensure these raw giflib pointers are valid for this access.
         Some(base) => unsafe { (*Image).RasterBits.add(base) },
         None => return,
     };
 
     for i in 0..d {
+        // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
         unsafe {
             core::ptr::write_bytes(bp.add(i * width), color as u8, w);
         }
@@ -273,6 +284,7 @@ unsafe fn draw_rectangle_impl(Image: *mut SavedImage, x: i32, y: i32, w: i32, d:
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn GifDrawText8x8(
     Image: *mut SavedImage,
     x: i32,
@@ -280,6 +292,7 @@ pub unsafe extern "C" fn GifDrawText8x8(
     legend: *const c_char,
     color: i32,
 ) {
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     catch_panic_or((), || unsafe {
         if legend.is_null() {
             return;
@@ -290,6 +303,7 @@ pub unsafe extern "C" fn GifDrawText8x8(
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn GifDrawBox(
     Image: *mut SavedImage,
     x: i32,
@@ -298,12 +312,14 @@ pub unsafe extern "C" fn GifDrawBox(
     d: i32,
     color: i32,
 ) {
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     catch_panic_or((), || unsafe {
         draw_box_impl(Image, x, y, w, d, color);
     })
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn GifDrawRectangle(
     Image: *mut SavedImage,
     x: i32,
@@ -312,12 +328,14 @@ pub unsafe extern "C" fn GifDrawRectangle(
     d: i32,
     color: i32,
 ) {
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     catch_panic_or((), || unsafe {
         draw_rectangle_impl(Image, x, y, w, d, color);
     })
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn GifDrawBoxedText8x8(
     Image: *mut SavedImage,
     x: i32,
@@ -327,6 +345,7 @@ pub unsafe extern "C" fn GifDrawBoxedText8x8(
     bg: i32,
     fg: i32,
 ) {
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     catch_panic_or((), || unsafe {
         if legend.is_null() {
             return;

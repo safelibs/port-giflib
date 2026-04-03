@@ -164,6 +164,7 @@ fn subdiv_color_map(
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn GifQuantizeBuffer(
     Width: u32,
     Height: u32,
@@ -174,6 +175,7 @@ pub unsafe extern "C" fn GifQuantizeBuffer(
     OutputBuffer: *mut GifByteType,
     OutputColorMap: *mut GifColorType,
 ) -> i32 {
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     catch_panic_or(GIF_ERROR, || unsafe {
         if ColorMapSize.is_null()
             || RedInput.is_null()

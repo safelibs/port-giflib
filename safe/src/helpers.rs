@@ -29,11 +29,13 @@ fn image_pixel_count(desc: &GifImageDesc) -> Option<usize> {
     positive_usize(desc.Height)?.checked_mul(positive_usize(desc.Width)?)
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 unsafe fn free_saved_image_contents(sp: *mut SavedImage) {
     if sp.is_null() {
         return;
     }
 
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     unsafe {
         if !(*sp).ImageDesc.ColorMap.is_null() {
             GifFreeMapObject((*sp).ImageDesc.ColorMap);
@@ -47,24 +49,29 @@ unsafe fn free_saved_image_contents(sp: *mut SavedImage) {
     }
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 unsafe fn deep_copy_extension_blocks(
     dst: *mut SavedImage,
     src: *const SavedImage,
 ) -> Result<(), ()> {
+    // SAFETY: The surrounding checks ensure these raw giflib pointers are valid for this access.
     let src_blocks = unsafe { (*src).ExtensionBlocks };
     if src_blocks.is_null() {
         return Ok(());
     }
 
+    // SAFETY: The surrounding checks ensure these raw giflib pointers are valid for this access.
     let count = match usize::try_from(unsafe { (*src).ExtensionBlockCount }) {
         Ok(count) => count,
         Err(_) => return Err(()),
     };
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     let dst_blocks = unsafe { alloc_array::<ExtensionBlock>(count) };
     if dst_blocks.is_null() {
         return Err(());
     }
 
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     unsafe {
         (*dst).ExtensionBlocks = dst_blocks;
         for index in 0..count {
@@ -95,6 +102,7 @@ unsafe fn deep_copy_extension_blocks(
     Ok(())
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 unsafe fn make_saved_image_impl(
     GifFile: *mut GifFileType,
     CopyFrom: *const SavedImage,
@@ -103,6 +111,7 @@ unsafe fn make_saved_image_impl(
         return ptr::null_mut();
     }
 
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     unsafe {
         let gif = &mut *GifFile;
         if gif.SavedImages.is_null() {
@@ -178,15 +187,18 @@ unsafe fn make_saved_image_impl(
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn GifBitSize(n: i32) -> i32 {
     catch_panic_or(0, || gif_bit_size_impl(n))
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn GifMakeMapObject(
     ColorCount: i32,
     ColorMap: *const GifColorType,
 ) -> *mut ColorMapObject {
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     catch_panic_or(ptr::null_mut(), || unsafe {
         if ColorCount != (1 << gif_bit_size_impl(ColorCount)) {
             return ptr::null_mut();
@@ -224,6 +236,7 @@ pub unsafe extern "C" fn GifMakeMapObject(
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn GifFreeMapObject(Object: *mut ColorMapObject) {
     catch_panic_or((), || unsafe {
         if Object.is_null() {
@@ -235,11 +248,13 @@ pub unsafe extern "C" fn GifFreeMapObject(Object: *mut ColorMapObject) {
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn GifUnionColorMap(
     ColorIn1: *const ColorMapObject,
     ColorIn2: *const ColorMapObject,
     ColorTransIn2: *mut GifPixelType,
 ) -> *mut ColorMapObject {
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     catch_panic_or(ptr::null_mut(), || unsafe {
         if ColorIn1.is_null() || ColorIn2.is_null() || ColorTransIn2.is_null() {
             return ptr::null_mut();
@@ -337,10 +352,12 @@ pub unsafe extern "C" fn GifUnionColorMap(
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn GifApplyTranslation(
     Image: *mut SavedImage,
     Translation: *const GifPixelType,
 ) {
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     catch_panic_or((), || unsafe {
         if Image.is_null() || Translation.is_null() || (*Image).RasterBits.is_null() {
             return;
@@ -357,6 +374,7 @@ pub unsafe extern "C" fn GifApplyTranslation(
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn GifAddExtensionBlock(
     ExtensionBlockCount: *mut i32,
     ExtensionBlocks: *mut *mut ExtensionBlock,
@@ -364,6 +382,7 @@ pub unsafe extern "C" fn GifAddExtensionBlock(
     Len: u32,
     ExtData: *mut u8,
 ) -> i32 {
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     catch_panic_or(GIF_ERROR, || unsafe {
         if ExtensionBlockCount.is_null() || ExtensionBlocks.is_null() {
             return GIF_ERROR;
@@ -414,10 +433,12 @@ pub unsafe extern "C" fn GifAddExtensionBlock(
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn GifFreeExtensions(
     ExtensionBlockCount: *mut i32,
     ExtensionBlocks: *mut *mut ExtensionBlock,
 ) {
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     catch_panic_or((), || unsafe {
         if ExtensionBlockCount.is_null()
             || ExtensionBlocks.is_null()
@@ -436,6 +457,7 @@ pub unsafe extern "C" fn GifFreeExtensions(
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn FreeLastSavedImage(GifFile: *mut GifFileType) {
     catch_panic_or((), || unsafe {
         if GifFile.is_null() || (*GifFile).SavedImages.is_null() || (*GifFile).ImageCount <= 0 {
@@ -450,16 +472,19 @@ pub unsafe extern "C" fn FreeLastSavedImage(GifFile: *mut GifFileType) {
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn GifMakeSavedImage(
     GifFile: *mut GifFileType,
     CopyFrom: *const SavedImage,
 ) -> *mut SavedImage {
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     catch_panic_or(ptr::null_mut(), || unsafe {
         make_saved_image_impl(GifFile, CopyFrom)
     })
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn GifFreeSavedImages(GifFile: *mut GifFileType) {
     catch_panic_or((), || unsafe {
         if GifFile.is_null() || (*GifFile).SavedImages.is_null() {

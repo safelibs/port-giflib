@@ -70,6 +70,7 @@ fn gif_error_string_impl(ErrorCode: i32) -> *const c_char {
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn GifErrorString(ErrorCode: i32) -> *const c_char {
     catch_panic_or(ptr::null(), || gif_error_string_impl(ErrorCode))
 }

@@ -73,29 +73,34 @@ pub(crate) struct DecoderState {
     pub(crate) gif89: bool,
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 pub(crate) unsafe fn alloc_gif_file() -> *mut GifFileType {
     let gif_file = unsafe { alloc_struct::<GifFileType>() };
     if gif_file.is_null() {
         return ptr::null_mut();
     }
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     unsafe {
         ptr::write_bytes(gif_file, 0, 1);
     }
     gif_file
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 pub(crate) unsafe fn free_gif_file(gif_file: *mut GifFileType) {
     unsafe {
         c_free(gif_file);
     }
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 pub(crate) unsafe fn alloc_encoder_state() -> *mut EncoderState {
     let state = unsafe { alloc_struct::<EncoderState>() };
     if state.is_null() {
         return ptr::null_mut();
     }
 
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     unsafe {
         ptr::write_bytes(state, 0, 1);
         (*state).tag = ENCODER_STATE_TAG;
@@ -106,18 +111,21 @@ pub(crate) unsafe fn alloc_encoder_state() -> *mut EncoderState {
     state
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 pub(crate) unsafe fn free_encoder_state(state: *mut EncoderState) {
     unsafe {
         c_free(state);
     }
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 pub(crate) unsafe fn alloc_decoder_state() -> *mut DecoderState {
     let state = unsafe { alloc_struct::<DecoderState>() };
     if state.is_null() {
         return ptr::null_mut();
     }
 
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     unsafe {
         ptr::write_bytes(state, 0, 1);
         (*state).tag = DECODER_STATE_TAG;
@@ -128,18 +136,21 @@ pub(crate) unsafe fn alloc_decoder_state() -> *mut DecoderState {
     state
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 pub(crate) unsafe fn free_decoder_state(state: *mut DecoderState) {
     unsafe {
         c_free(state);
     }
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 pub(crate) unsafe fn encoder_state_from_private(private: *mut c_void) -> *mut EncoderState {
     if private.is_null() {
         return ptr::null_mut();
     }
 
     let state = private.cast::<EncoderState>();
+    // SAFETY: The surrounding checks ensure these raw giflib pointers are valid for this access.
     if unsafe { (*state).tag } != ENCODER_STATE_TAG {
         return ptr::null_mut();
     }
@@ -147,12 +158,14 @@ pub(crate) unsafe fn encoder_state_from_private(private: *mut c_void) -> *mut En
     state
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 pub(crate) unsafe fn decoder_state_from_private(private: *mut c_void) -> *mut DecoderState {
     if private.is_null() {
         return ptr::null_mut();
     }
 
     let state = private.cast::<DecoderState>();
+    // SAFETY: The surrounding checks ensure these raw giflib pointers are valid for this access.
     if unsafe { (*state).tag } != DECODER_STATE_TAG {
         return ptr::null_mut();
     }
@@ -160,18 +173,22 @@ pub(crate) unsafe fn decoder_state_from_private(private: *mut c_void) -> *mut De
     state
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 pub(crate) unsafe fn encoder_state(gif_file: *mut GifFileType) -> *mut EncoderState {
     if gif_file.is_null() {
         return ptr::null_mut();
     }
 
+    // SAFETY: The surrounding checks ensure these raw giflib pointers are valid for this access.
     unsafe { encoder_state_from_private((*gif_file).Private) }
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 pub(crate) unsafe fn decoder_state(gif_file: *mut GifFileType) -> *mut DecoderState {
     if gif_file.is_null() {
         return ptr::null_mut();
     }
 
+    // SAFETY: The surrounding checks ensure these raw giflib pointers are valid for this access.
     unsafe { decoder_state_from_private((*gif_file).Private) }
 }

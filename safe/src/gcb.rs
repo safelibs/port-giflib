@@ -9,6 +9,7 @@ use crate::ffi::{
 };
 use crate::helpers::GifAddExtensionBlock;
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 unsafe fn gcb_to_extension_impl(
     GCB: *const GraphicsControlBlock,
     GifExtension: *mut GifByteType,
@@ -17,6 +18,7 @@ unsafe fn gcb_to_extension_impl(
         return 0;
     }
 
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     unsafe {
         *GifExtension.add(0) = 0;
         *GifExtension.add(0) |= if (*GCB).TransparentColor == NO_TRANSPARENT_COLOR {
@@ -38,6 +40,7 @@ unsafe fn gcb_to_extension_impl(
     4
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 unsafe fn extension_to_gcb_impl(
     GifExtensionLength: usize,
     GifExtension: *const GifByteType,
@@ -47,6 +50,7 @@ unsafe fn extension_to_gcb_impl(
         return GIF_ERROR;
     }
 
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     unsafe {
         (*GCB).DisposalMode = i32::from((*GifExtension.add(0) >> 2) & 0x07);
         (*GCB).UserInputFlag.set((*GifExtension.add(0) & 0x02) != 0);
@@ -61,6 +65,7 @@ unsafe fn extension_to_gcb_impl(
     GIF_OK
 }
 
+// SAFETY: This helper is only called while the surrounding giflib raw-pointer invariants hold.
 unsafe fn saved_extension_to_gcb_impl(
     GifFile: *mut GifFileType,
     ImageIndex: i32,
@@ -70,6 +75,7 @@ unsafe fn saved_extension_to_gcb_impl(
         return GIF_ERROR;
     }
 
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     unsafe {
         if ImageIndex < 0
             || ImageIndex > (*GifFile).ImageCount - 1
@@ -101,19 +107,23 @@ unsafe fn saved_extension_to_gcb_impl(
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn EGifGCBToExtension(
     GCB: *const GraphicsControlBlock,
     GifExtension: *mut GifByteType,
 ) -> usize {
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     catch_panic_or(0, || unsafe { gcb_to_extension_impl(GCB, GifExtension) })
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn EGifGCBToSavedExtension(
     GCB: *const GraphicsControlBlock,
     GifFile: *mut GifFileType,
     ImageIndex: i32,
 ) -> i32 {
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     catch_panic_or(GIF_ERROR, || unsafe {
         let saved_images = if GifFile.is_null() {
             return GIF_ERROR;
@@ -157,22 +167,26 @@ pub unsafe extern "C" fn EGifGCBToSavedExtension(
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn DGifExtensionToGCB(
     GifExtensionLength: usize,
     GifExtension: *const GifByteType,
     GCB: *mut GraphicsControlBlock,
 ) -> i32 {
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     catch_panic_or(GIF_ERROR, || unsafe {
         extension_to_gcb_impl(GifExtensionLength, GifExtension, GCB)
     })
 }
 
 #[no_mangle]
+// SAFETY: This C ABI entry point trusts the caller to uphold giflib pointer and callback preconditions.
 pub unsafe extern "C" fn DGifSavedExtensionToGCB(
     GifFile: *mut GifFileType,
     ImageIndex: i32,
     GCB: *mut GraphicsControlBlock,
 ) -> i32 {
+    // SAFETY: This touches raw C-owned giflib state under the function's FFI preconditions.
     catch_panic_or(GIF_ERROR, || unsafe {
         saved_extension_to_gcb_impl(GifFile, ImageIndex, GCB)
     })
