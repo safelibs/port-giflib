@@ -8,13 +8,14 @@
 - The public C API is defined in [`original/gif_lib.h`](/home/yans/code/safelibs/ported/giflib/original/gif_lib.h). It exposes:
   - public structs: `GifColorType`, `ColorMapObject`, `GifImageDesc`, `ExtensionBlock`, `SavedImage`, `GifFileType`, `GraphicsControlBlock`
   - sequential decode/write APIs: `DGif*` and `EGif*`
+  - version/GCB/error helpers: `DGifGetGifVersion`, `EGifGetGifVersion`, `EGifSetGifVersion`, `DGifExtensionToGCB`, `DGifSavedExtensionToGCB`, `EGifGCBToExtension`, `EGifGCBToSavedExtension`, `GifBitSize`, `GifErrorString`
   - high-level helpers: `GifMakeMapObject`, `GifFreeMapObject`, `GifUnionColorMap`, `GifApplyTranslation`, `GifAddExtensionBlock`, `GifFreeExtensions`, `GifMakeSavedImage`, `GifFreeSavedImages`
   - quantization and drawing helpers: `GifQuantizeBuffer`, `GifAsciiTable8x8`, `GifDrawText8x8`, `GifDrawBox`, `GifDrawRectangle`, `GifDrawBoxedText8x8`
-- The actual ELF export contract is broader than the public header. [`original/debian/libgif7.symbols`](/home/yans/code/safelibs/ported/giflib/original/debian/libgif7.symbols) and `objdump -T original/libgif.so` show that the replacement library must also export `DGifDecreaseImageCounter`, `FreeLastSavedImage`, `_InitHashTable`, `_ClearHashTable`, `_InsertHashTable`, `_ExistsHashTable`, and `openbsd_reallocarray`, plus the data symbol `GifAsciiTable8x8`.
+- The actual ELF export contract is broader than the public header. [`original/debian/libgif7.symbols`](/home/yans/code/safelibs/ported/giflib/original/debian/libgif7.symbols) is the authoritative export list, and the currently present local `original/libgif.so` build in this workspace confirms that the replacement library must also export `DGifDecreaseImageCounter`, `FreeLastSavedImage`, `_InitHashTable`, `_ClearHashTable`, `_InsertHashTable`, `_ExistsHashTable`, and `openbsd_reallocarray`, plus the data symbol `GifAsciiTable8x8`.
 - The installed header surface is narrower than the ELF export surface. [`original/Makefile`](/home/yans/code/safelibs/ported/giflib/original/Makefile) installs only `gif_lib.h`, and the `libgif-dev` package definition in [`original/debian/libgif-dev.install`](/home/yans/code/safelibs/ported/giflib/original/debian/libgif-dev.install) must remain library-only. `gif_hash.h` and `gif_lib_private.h` stay as build/test oracles, not installed headers, even though the exported hash-helper symbols must remain link-compatible.
-- `objdump -T original/libgif.so` shows the current exported `libgif` symbols are all `Base` symbols with SONAME `libgif.so.7`. There is no custom version script to reproduce; the practical ELF requirements are symbol-name parity, symbol-kind parity for `GifAsciiTable8x8`, and SONAME parity.
+- The currently present local `original/libgif.so` build in this workspace shows the current exported `libgif` symbols are all `Base` symbols with SONAME `libgif.so.7`. There is no custom version script to reproduce; the practical ELF requirements are symbol-name parity, symbol-kind parity for `GifAsciiTable8x8`, and SONAME parity.
 - The core library build is defined in [`original/Makefile`](/home/yans/code/safelibs/ported/giflib/original/Makefile). The library sources are `dgif_lib.c`, `egif_lib.c`, `gifalloc.c`, `gif_err.c`, `gif_font.c`, `gif_hash.c`, `openbsd-reallocarray.c`, and `quantize.c`. `libutil` and the CLI utilities are built separately and are not part of the `libgif7` package contract, so they are out of scope for the Rust port except as downstream consumers during validation. The build granularity matters: the upstream makefile compiles one object per `.c` file, so `egif_lib.c` and `dgif_lib.c` are each single export-bearing translation units. Without adding an explicit shim or split source in `safe/`, the bootstrap backend cannot keep `DGifSlurp` from original `dgif_lib.c` while replacing the rest of the `DGif*` exports in Rust.
-- The installed package contract comes from [`original/debian/control`](/home/yans/code/safelibs/ported/giflib/original/debian/control), [`original/debian/rules`](/home/yans/code/safelibs/ported/giflib/original/debian/rules), [`original/debian/libgif7.install`](/home/yans/code/safelibs/ported/giflib/original/debian/libgif7.install), [`original/debian/libgif-dev.install`](/home/yans/code/safelibs/ported/giflib/original/debian/libgif-dev.install), [`original/debian/pkgconfig/libgif7.pc.in`](/home/yans/code/safelibs/ported/giflib/original/debian/pkgconfig/libgif7.pc.in), and [`original/debian/libgif7.symbols`](/home/yans/code/safelibs/ported/giflib/original/debian/libgif7.symbols). The safe port must still ship `libgif7` and `libgif-dev`, install `gif_lib.h`, `libgif.so.7`, `libgif.so`, `libgif.a`, `libgif7.pc`, and `libgif.pc`, and remain a drop-in Ubuntu 24.04 replacement. Because the original Debian rules create `libgif.pc` as an absolute symlink into `/usr/lib/$multiarch/pkgconfig/`, the safe packaging must deliberately tighten that detail: `libgif.pc` must be either a real file or a relative symlink to `libgif7.pc` so extracted-package verification stays self-contained and cannot fall through to host pkg-config state. Because the current Ubuntu package version recorded in [`original/debian/changelog`](/home/yans/code/safelibs/ported/giflib/original/debian/changelog) is `5.2.2-1ubuntu1`, the safe packaging must also use a distinct local version suffix such as `5.2.2-1ubuntu1+safelibs1` rather than reusing the stock version verbatim; downstream verification needs that version distinction to prove it exercised the locally built replacement packages instead of the archive copy. That version form retains a Debian revision, so `safe/debian/source/format` must be a non-native format such as `3.0 (quilt)`; `3.0 (native)` is not acceptable for this package plan.
+- The installed package contract comes from [`original/debian/control`](/home/yans/code/safelibs/ported/giflib/original/debian/control), [`original/debian/rules`](/home/yans/code/safelibs/ported/giflib/original/debian/rules), [`original/debian/libgif7.install`](/home/yans/code/safelibs/ported/giflib/original/debian/libgif7.install), [`original/debian/libgif-dev.install`](/home/yans/code/safelibs/ported/giflib/original/debian/libgif-dev.install), [`original/debian/pkgconfig/libgif7.pc.in`](/home/yans/code/safelibs/ported/giflib/original/debian/pkgconfig/libgif7.pc.in), [`original/debian/source/format`](/home/yans/code/safelibs/ported/giflib/original/debian/source/format), and [`original/debian/libgif7.symbols`](/home/yans/code/safelibs/ported/giflib/original/debian/libgif7.symbols). The safe port must still ship `libgif7` and `libgif-dev`, install `gif_lib.h`, `libgif.so.7`, `libgif.so`, `libgif.a`, `libgif7.pc`, and `libgif.pc`, and remain a drop-in Ubuntu 24.04 replacement. Because the original Debian rules create `libgif.pc` as an absolute symlink into `/usr/lib/$multiarch/pkgconfig/`, the safe packaging must deliberately tighten that detail: `libgif.pc` must be either a real file or a relative symlink to `libgif7.pc` so extracted-package verification stays self-contained and cannot fall through to host pkg-config state. Because the current Ubuntu package version recorded in [`original/debian/changelog`](/home/yans/code/safelibs/ported/giflib/original/debian/changelog) is `5.2.2-1ubuntu1`, the safe packaging must also use a distinct local version suffix such as `5.2.2-1ubuntu1+safelibs1` rather than reusing the stock version verbatim; downstream verification needs that version distinction to prove it exercised the locally built replacement packages instead of the archive copy. That version form retains a Debian revision, so `safe/debian/source/format` must be a non-native format such as `3.0 (quilt)`; `3.0 (native)` is not acceptable for this package plan.
 - The in-repo regression suite is already concentrated on the public library surface. [`original/tests/makefile`](/home/yans/code/safelibs/ported/giflib/original/tests/makefile) drives [`original/tests/public_api_regress.c`](/home/yans/code/safelibs/ported/giflib/original/tests/public_api_regress.c), and the target-to-API mapping matters for phase-local verification:
   - `fileio-regress` is the direct coverage for `DGifOpenFileName`, `DGifOpenFileHandle`, `EGifOpenFileName`, and `EGifOpenFileHandle`
   - `alloc-regress` is the direct coverage for `EGifGCBToExtension`, `EGifGCBToSavedExtension`, `DGifSavedExtensionToGCB`, `GifAddExtensionBlock`, and other allocation/helper APIs
@@ -56,6 +57,7 @@ The generated workflow derived from this plan must obey all of the following rul
 - Linear execution only. Do not use `parallel_groups`.
 - Use self-contained inline YAML only. Do not use top-level `include`, and do not use phase-level `prompt_file`, `workflow_file`, `workflow_dir`, `checks`, or any other YAML-source indirection.
 - Before the generated workflow begins, this refined `.plan/plan.md` must already be committed in `HEAD` in a planning-only commit, or in a commit whose only tracked changes are under `.plan/`. Treat that git-history requirement as a prerequisite, not as a generated workflow phase, so later checkers can reason linearly from committed history.
+- Workflow generation and review must refuse to proceed if `git status --short` shows any tracked modification, deletion, or addition outside `.plan/`, if `git diff --quiet HEAD -- .plan/plan.md` fails, or if any tracked file under [`original/`](/home/yans/code/safelibs/ported/giflib/original) is modified or deleted. The planning state handed to workflow generation must be fully committed and otherwise clean.
 - Do not use agent-guided `bounce_targets` lists. Every verifier must use exactly one fixed `bounce_target`.
 - Every verifier must be an explicit top-level `check` phase.
 - Every verifier must stay in the implement block it verifies and must bounce only to that implement phase.
@@ -70,23 +72,29 @@ The generated workflow derived from this plan must obey all of the following rul
 - Any verifier that claims local source-compatibility coverage must separately prove the installed safe header and the ordinary regression build path, not just ABI layout. Concretely: `cmp -s safe/include/gif_lib.h original/gif_lib.h`, then run `safe-header-regress` from `safe/tests/Makefile` with `LIBGIF_INCLUDEDIR="$PWD/safe/include"` and `ORIGINAL_INCLUDEDIR` pointed at an otherwise empty temporary directory so the ordinary `public_api_regress` build can only find `gif_lib.h` under `LIBGIF_INCLUDEDIR`. `safe-header-regress` must build the same ordinary regression binary used by the other public regression targets and run at least `legacy`, `fileio`, and `alloc`. The only target allowed to compile [`original/tests/public_api_regress.c`](/home/yans/code/safelibs/ported/giflib/original/tests/public_api_regress.c) against `$(ORIGINAL_INCLUDEDIR)/gif_lib.h` is `link-compat-regress`.
 - Any verifier that claims package-surface coverage must validate the runtime and development packages separately and must prove each required path individually. At minimum, prove that `libgif7` contains one real versioned `libgif.so.7.*` ELF plus the `libgif.so.7` symlink, and prove that `libgif-dev` contains `gif_lib.h`, `libgif.a`, the `libgif.so` linker entry, `libgif7.pc`, and `libgif.pc`. Also prove that the extracted package include trees contain exactly one installed header file, `gif_lib.h`, and reject `gif_hash.h` or `gif_lib_private.h` recursively anywhere under either extracted package tree. When validating pkg-config metadata from extracted package trees, isolate `pkg-config` from host search paths with `PKG_CONFIG_LIBDIR` plus an empty `PKG_CONFIG_PATH`, and require `libgif.pc` to be either a regular file or a relative symlink that resolves inside the extracted `pkgconfig/` directory. Do not use a single alternation grep that can succeed on only one required path.
 - Any verifier that claims package-surface coverage must also compile [`original/tests/public_api_regress.c`](/home/yans/code/safelibs/ported/giflib/original/tests/public_api_regress.c) against the extracted `libgif-dev` header and extracted `libgif.a`, then run at least `legacy` and `alloc` with that packaged binary. Package-file presence alone is not enough.
-- Any verifier that claims downstream package-replacement coverage must first prove that [`test-original.sh`](/home/yans/code/safelibs/ported/giflib/test-original.sh) no longer contains `/usr/local` assumptions or original-install helpers such as `build_original_giflib` or `assert_uses_original`, that it makes `safe/` available inside the container at `/work/safe`, and that it defines and uses explicit helpers named `build_safe_packages`, `install_safe_packages`, `resolve_installed_shared_libgif`, `resolve_installed_static_libgif`, `assert_links_to_active_shared_libgif`, and `assert_build_uses_active_giflib`. `build_safe_packages` must build local `libgif7` and `libgif-dev` `.deb`s from `/work/safe`, record the exact built artifact paths in `SAFE_RUNTIME_DEB` and `SAFE_DEV_DEB`, and capture their `Package`/`Version` fields into `SAFE_RUNTIME_PACKAGE`, `SAFE_DEV_PACKAGE`, `SAFE_RUNTIME_VERSION`, and `SAFE_DEV_VERSION` via `dpkg-deb -f`. `install_safe_packages` must install those exact `.deb` paths via `dpkg -i`, assert with `dpkg-query -W` that the active `libgif7` and `libgif-dev` versions equal the recorded built versions, and emit `ACTIVE_RUNTIME_VERSION` and `ACTIVE_DEV_VERSION`. `resolve_installed_shared_libgif` and `resolve_installed_static_libgif` must each take a mandatory label, derive the active runtime/development library paths from package metadata such as `dpkg-query -L` plus `ldconfig`, assert ownership with `dpkg-query -S`, export shell variables `ACTIVE_SHARED_LIBGIF`, `ACTIVE_STATIC_LIBGIF`, `ACTIVE_SHARED_OWNER`, and `ACTIVE_STATIC_OWNER`, and print labeled log lines `ACTIVE_SHARED_LIBGIF[$label]=...`, `ACTIVE_STATIC_LIBGIF[$label]=...`, `ACTIVE_SHARED_OWNER[$label]=...`, and `ACTIVE_STATIC_OWNER[$label]=...`. `assert_links_to_active_shared_libgif` must immediately call `resolve_installed_shared_libgif "$label"` and assert that `ldd` output contains the resolved `ACTIVE_SHARED_LIBGIF`; it is reserved for the runtime labels `giflib-tools-runtime`, `webp-runtime`, `fbi-runtime`, `mtpaint-runtime`, `tracker-extract-runtime`, `libextractor-runtime`, `camlimages-runtime`, and `gdal-runtime`. `assert_build_uses_active_giflib` must immediately call both resolvers with the same label, assert either that `ldd` contains `ACTIVE_SHARED_LIBGIF` or that the recorded build link command for that same build contains `ACTIVE_STATIC_LIBGIF`, and print `LINK_ASSERT_MODE[$label]=shared|static`; it is required for every source-build label `gdal-source`, `exactimage-source`, `sail-source`, `libwebp-source`, and `imlib2-source`. Checkers must inspect both the script contents and the captured `./test-original.sh` log; helper-name greps alone are insufficient.
+- Any verifier that claims package-surface coverage must also prove the safe Debian source stays library-only: `dpkg-buildpackage` may emit `libgif7`, `libgif-dev`, and optionally `libgif7-dbgsym`, but it must not emit `giflib-tools` or any other unexpected binary package artifact. Checkers must count the matching `.deb` files instead of accepting the first `ls` match.
+- Any verifier that claims downstream package-replacement coverage must first prove that [`test-original.sh`](/home/yans/code/safelibs/ported/giflib/test-original.sh) no longer contains `/usr/local` assumptions or original-install helpers such as `build_original_giflib` or `assert_uses_original`, that it copies `safe/` into the container at `/work/safe`, that it keeps [`original/`](/home/yans/code/safelibs/ported/giflib/original) available inside the container at `/work/original` as a fixture oracle, and that it defines and uses explicit helpers named `build_safe_packages`, `install_safe_packages`, `resolve_installed_shared_libgif`, `resolve_installed_static_libgif`, `assert_links_to_active_shared_libgif`, and `assert_build_uses_active_giflib`. `build_safe_packages` must build local `libgif7` and `libgif-dev` `.deb`s from `/work/safe`, record the exact built artifact paths in `SAFE_RUNTIME_DEB` and `SAFE_DEV_DEB`, and capture their `Package`/`Version` fields into `SAFE_RUNTIME_PACKAGE`, `SAFE_DEV_PACKAGE`, `SAFE_RUNTIME_VERSION`, and `SAFE_DEV_VERSION` via `dpkg-deb -f`. `install_safe_packages` must install those exact `.deb` paths via `dpkg -i`, assert with `dpkg-query -W` that the active `libgif7` and `libgif-dev` versions equal the recorded built versions, and emit `ACTIVE_RUNTIME_VERSION` and `ACTIVE_DEV_VERSION`. `resolve_installed_shared_libgif` and `resolve_installed_static_libgif` must each take a mandatory label, derive the active runtime/development library paths from package metadata such as `dpkg-query -L` plus `ldconfig`, assert ownership with `dpkg-query -S`, export shell variables `ACTIVE_SHARED_LIBGIF`, `ACTIVE_STATIC_LIBGIF`, `ACTIVE_SHARED_OWNER`, and `ACTIVE_STATIC_OWNER`, and print labeled log lines `ACTIVE_SHARED_LIBGIF[$label]=...`, `ACTIVE_STATIC_LIBGIF[$label]=...`, `ACTIVE_SHARED_OWNER[$label]=...`, and `ACTIVE_STATIC_OWNER[$label]=...`. `assert_links_to_active_shared_libgif` must immediately call `resolve_installed_shared_libgif "$label"` and assert that `ldd` output contains the resolved `ACTIVE_SHARED_LIBGIF`; it is reserved for the runtime labels `giflib-tools-runtime`, `webp-runtime`, `fbi-runtime`, `mtpaint-runtime`, `tracker-extract-runtime`, `libextractor-runtime`, `camlimages-runtime`, and `gdal-runtime`. `assert_build_uses_active_giflib` must immediately call both resolvers with the same label, assert either that `ldd` contains `ACTIVE_SHARED_LIBGIF` or that the recorded build link command for that same build contains `ACTIVE_STATIC_LIBGIF`, and print `LINK_ASSERT_MODE[$label]=shared|static`; it is required for every source-build label `gdal-source`, `exactimage-source`, `sail-source`, `libwebp-source`, and `imlib2-source`. Checkers must inspect both the script contents and the captured `./test-original.sh` log; helper-name greps alone are insufficient.
 - Any helper script added under `safe/tests/` must resolve the repository root from its own path before reading fixtures or writing derived outputs. Checkers should not assume those scripts are always invoked from the repository root.
 - Consume existing artifacts in place instead of rediscovering or regenerating them:
   - [`original/`](/home/yans/code/safelibs/ported/giflib/original) is the authoritative source snapshot and ABI oracle
   - [`original/tests/`](/home/yans/code/safelibs/ported/giflib/original/tests) and [`original/pic/`](/home/yans/code/safelibs/ported/giflib/original/pic) are the authoritative fixtures/oracles
   - [`original/debian/`](/home/yans/code/safelibs/ported/giflib/original/debian) is the authoritative packaging template set
   - [`dependents.json`](/home/yans/code/safelibs/ported/giflib/dependents.json), [`test-original.sh`](/home/yans/code/safelibs/ported/giflib/test-original.sh), and [`relevant_cves.json`](/home/yans/code/safelibs/ported/giflib/relevant_cves.json) are authoritative downstream/security inputs
-- Treat tracked files under [`original/`](/home/yans/code/safelibs/ported/giflib/original) as immutable oracle inputs. Local builds may create transient untracked artifacts there, but no implementation phase should commit edits, deletions, or replacements under `original/`.
+- Treat tracked files under [`original/`](/home/yans/code/safelibs/ported/giflib/original) as immutable oracle inputs. Read them in place, but do not run destructive clean, package, or doc-generation flows in the tracked `original/` tree: upstream clean rules remove files under `original/doc/`, including tracked oracle docs. If a phase needs to run commands that could rewrite or remove tracked oracle files, first copy `original/` to a temporary directory and operate only on that copy.
+- No phase may rely on `original/libgif.so`, `original/libgif.a`, or other generated build outputs already existing under the tracked `original/` tree. When a rebuilt original-library oracle is needed, stage it from a temporary copy of `original/` and point compile/link commands at that copy.
 - Preserve the consume-existing-artifacts contract explicitly in every phase that uses headers, fixtures, Debian metadata, downstream inventory, or CVE notes.
 - For the regression suite specifically, `safe/tests/Makefile` must compile [`original/tests/public_api_regress.c`](/home/yans/code/safelibs/ported/giflib/original/tests/public_api_regress.c) and compare against committed oracle files under [`original/tests/`](/home/yans/code/safelibs/ported/giflib/original/tests) and sample GIFs under [`original/pic/`](/home/yans/code/safelibs/ported/giflib/original/pic) in place. Do not create committed duplicate copies of those original harness/oracle files under `safe/tests/`.
 - Any verifier that enforces the regression-fixture consume-existing-artifacts contract must search recursively under `safe/tests/`, not just at depth 1. Reject any file or symlink named `public_api_regress.c`, `*.summary`, `*.ico`, `*.dmp`, `*.map`, or `*.rgb` anywhere under `safe/tests/`. Reject any `*.gif` anywhere under `safe/tests/` except the derived malformed fixtures under `safe/tests/malformed/`.
 - Do not widen the installed header surface. `gif_lib.h` remains the only installed public header; `gif_hash.h` and `gif_lib_private.h` may be used for tests or ABI oracles but must not be installed into `safe/include` or the Debian packages.
 - If new malformed-input fixtures are needed, derive them from existing GIF fixtures already in the workspace and record their provenance, rather than inventing unrelated fresh inputs.
-- Until a checker explicitly installs doc-generation prerequisites, baseline-oracle commands should prefer:
-  - `make -C original libgif.so libgif.a`
-  - `make -C original/tests test`
-  instead of `make -C original check`, because the top-level build still routes through docs/manpage generation.
+- When a checker needs a rebuilt original-library oracle, it should prefer a temporary-copy flow such as:
+  ```bash
+  original_build_dir="$(mktemp -d)"
+  cp -a original/. "$original_build_dir"
+  make -C "$original_build_dir" libgif.so libgif.a
+  make -C "$original_build_dir/tests" test
+  ```
+  Do not run `make -C original clean`, `make -C original check`, `debian/rules`, or `dpkg-buildpackage` in the tracked `original/` tree, because those paths route through doc/manpage generation or cleanup rules that can delete oracle files under `original/doc/`.
 - Every implement prompt in the generated workflow must instruct the agent to commit work to git before yielding.
 - Do not modify [`dependents.json`](/home/yans/code/safelibs/ported/giflib/dependents.json). The downstream harness phases must consume the existing dependent matrix in place.
 - From the first phase that exports Rust-defined C ABI symbols onward, the implementation prompt must require those entry points to catch panics and return C-compatible failure values instead of unwinding across the ABI boundary.
@@ -361,14 +369,17 @@ The generated workflow derived from this plan must obey all of the following rul
     - purpose: verify that the derived malformed fixtures are committed with provenance, that the original malformed-input compatibility baseline is captured as an explicit artifact, that the safe library matches that baseline while rejecting the inputs without crashes or panics, and that decoder hardening does not regress the direct sequential decoder APIs.
     - commands:
       ```bash
-      make -C original libgif.so libgif.a
+      original_build_dir="$(mktemp -d)"
+      trap 'rm -rf "$original_build_dir"' EXIT
+      cp -a original/. "$original_build_dir"
+      make -C "$original_build_dir" libgif.so libgif.a
       cargo build --manifest-path safe/Cargo.toml --release
       if rg -n '\.\./original/.*\.c|cc::Build|legacy backend|gif_legacy' safe/build.rs safe/Cargo.toml safe/src; then
         echo 'unexpected bootstrap reference remains in library build inputs during security hardening' >&2
         exit 1
       fi
       cmp -s safe/include/gif_lib.h original/gif_lib.h
-      cc -std=gnu99 -Wall -Wextra -I"$PWD/original" safe/tests/malformed_observe.c original/libgif.a -o /tmp/malformed_observe.original
+      cc -std=gnu99 -Wall -Wextra -I"$original_build_dir" safe/tests/malformed_observe.c "$original_build_dir/libgif.a" -o /tmp/malformed_observe.original
       safe/tests/capture_malformed_baseline.sh /tmp/malformed_observe.original "$PWD/safe/tests/malformed" > /tmp/original-malformed-baseline.txt
       diff -u safe/tests/malformed/original-baseline.txt /tmp/original-malformed-baseline.txt
       header_only_dir="$(mktemp -d)"
@@ -408,7 +419,7 @@ The generated workflow derived from this plan must obey all of the following rul
   - Add `safe/tests/malformed_observe.c` as a deterministic test-only helper that emits one tab-separated line per malformed fixture with the fixture basename as field 1, followed by integer fields `open_nonnull`, `open_error`, `slurp_rc`, `gif_error_after_slurp`, `close_rc`, and `close_error`.
   - Add `safe/tests/capture_malformed_baseline.sh` to resolve the repository root from its own path, run the helper only over the committed malformed `*.gif` inputs in `safe/tests/malformed/` in lexical order, exclude metadata files such as `manifest.txt` and `original-baseline.txt`, and write `safe/tests/malformed/original-baseline.txt`.
   - Add a `malformed-baseline-regress` target to `safe/tests/Makefile` that compiles the observation helper against the safe library, captures the same tab-separated matrix, and diffs it against `safe/tests/malformed/original-baseline.txt`.
-  - Capture the baseline by compiling `safe/tests/malformed_observe.c` against the original library built from [`original/Makefile`](/home/yans/code/safelibs/ported/giflib/original/Makefile) and commit the resulting `safe/tests/malformed/original-baseline.txt` in this phase.
+  - Capture the baseline by compiling `safe/tests/malformed_observe.c` against the original library built from a temporary copy of [`original/`](/home/yans/code/safelibs/ported/giflib/original) using [`original/Makefile`](/home/yans/code/safelibs/ported/giflib/original/Makefile), and commit the resulting `safe/tests/malformed/original-baseline.txt` in this phase.
   - Keep the safe library's observable malformed-input results identical to the committed baseline for the committed fixtures. If a candidate malformed fixture would force a safety-motivated behavioral divergence, adjust or replace that fixture instead of relying on an undocumented mismatch.
   - Restrict `safe/src/lib.rs` changes in this phase to decoder/slurp hardening and decoder-side error/panic boundaries; defer unrelated helper, encoder, quantization, and package-surface refactors to later phases so the phase-local verifier can stay decoder-focused.
 - `Verification`:
@@ -427,9 +438,12 @@ The generated workflow derived from this plan must obey all of the following rul
     - purpose: verify that the Rust port stays within the fixed performance budget on the exact decode, slurp/spew, and quantization workloads named in the workflow contract, and that performance tuning does not regress behavior.
     - commands:
       ```bash
-      make -C original libgif.so libgif.a
+      original_build_dir="$(mktemp -d)"
+      trap 'rm -rf "$original_build_dir"' EXIT
+      cp -a original/. "$original_build_dir"
+      make -C "$original_build_dir" libgif.so libgif.a
       cargo build --manifest-path safe/Cargo.toml --release
-      cc -std=gnu99 -Wall -Wextra -I"$PWD/original" original/tests/public_api_regress.c original/libgif.a -o /tmp/public_api_regress.original
+      cc -std=gnu99 -Wall -Wextra -I"$original_build_dir" "$original_build_dir/tests/public_api_regress.c" "$original_build_dir/libgif.a" -o /tmp/public_api_regress.original
       cc -std=gnu99 -Wall -Wextra -I"$PWD/original" original/tests/public_api_regress.c "$PWD/safe/target/release/libgif.a" -o /tmp/public_api_regress.safe
       safe/tests/perf_compare.sh /tmp/public_api_regress.original /tmp/public_api_regress.safe | tee /tmp/perf.log
       grep -E '^PERF workload=render-welcome2 .* threshold=2\.00$' /tmp/perf.log
@@ -457,6 +471,7 @@ The generated workflow derived from this plan must obey all of the following rul
   - update `safe/Cargo.toml`
   - update hot-path modules such as `safe/src/decode.rs`, `safe/src/encode.rs`, `safe/src/quantize.rs`, `safe/src/helpers.rs`, and `safe/src/state.rs`
 - `Implementation Details`:
+  - Build the original performance baseline from a temporary copy of [`original/`](/home/yans/code/safelibs/ported/giflib/original), not by mutating the tracked oracle tree in place.
   - Create `safe/tests/perf_compare.sh` as a deterministic local benchmark script that:
     - accepts two `public_api_regress` binaries, one linked to original `libgif.a` and one linked to safe `libgif.a`
     - resolves the repository root from its own path instead of assuming the caller's `PWD`
@@ -492,9 +507,18 @@ The generated workflow derived from this plan must obey all of the following rul
       grep -x '3.0 (quilt)' safe/debian/source/format
       rm -f safe/../libgif7_*.deb safe/../libgif-dev_*.deb safe/../libgif7-dbgsym_*.deb
       (cd safe && dpkg-buildpackage -us -uc -b)
+      if find safe/.. -maxdepth 1 -type f -name '*.deb' ! -name 'libgif7_*.deb' ! -name 'libgif-dev_*.deb' ! -name 'libgif7-dbgsym_*.deb' | grep -q .; then
+        echo 'unexpected non-library Debian package artifact built from safe/' >&2
+        find safe/.. -maxdepth 1 -type f -name '*.deb' >&2
+        exit 1
+      fi
       multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
-      runtime_deb="$(ls -1 safe/../libgif7_*.deb)"
-      dev_deb="$(ls -1 safe/../libgif-dev_*.deb)"
+      runtime_matches="$(find safe/.. -maxdepth 1 -type f -name 'libgif7_*.deb' | LC_ALL=C sort)"
+      dev_matches="$(find safe/.. -maxdepth 1 -type f -name 'libgif-dev_*.deb' | LC_ALL=C sort)"
+      test "$(printf '%s\n' "$runtime_matches" | sed '/^$/d' | wc -l)" -eq 1
+      test "$(printf '%s\n' "$dev_matches" | sed '/^$/d' | wc -l)" -eq 1
+      runtime_deb="$(printf '%s\n' "$runtime_matches" | head -n1)"
+      dev_deb="$(printf '%s\n' "$dev_matches" | head -n1)"
       test "$(dpkg-deb -f "$runtime_deb" Package)" = "libgif7"
       test "$(dpkg-deb -f "$dev_deb" Package)" = "libgif-dev"
       runtime_version="$(dpkg-deb -f "$runtime_deb" Version)"
@@ -571,6 +595,7 @@ The generated workflow derived from this plan must obey all of the following rul
         exit 1
       fi
       rg -n '^COPY[[:space:]]+\\.?/?safe/?[[:space:]]+/work/safe/?$' test-original.sh
+      rg -n '^COPY[[:space:]]+\\.?/?original/?[[:space:]]+/work/original/?$' test-original.sh
       rg -n '^build_safe_packages\(\)' test-original.sh
       rg -n '^install_safe_packages\(\)' test-original.sh
       rg -n '^resolve_installed_shared_libgif\(\)' test-original.sh
@@ -703,7 +728,7 @@ The generated workflow derived from this plan must obey all of the following rul
   - Install `libgif.pc` as either a regular file or a relative symlink `libgif.pc -> libgif7.pc`. Do not reuse the original absolute symlink form, because the phase-local extracted-package validation must stay self-contained and independent of the host `/usr/lib` tree.
   - Keep the symbol file semantically identical to [`original/debian/libgif7.symbols`](/home/yans/code/safelibs/ported/giflib/original/debian/libgif7.symbols).
   - Update [`test-original.sh`](/home/yans/code/safelibs/ported/giflib/test-original.sh) so the container:
-    - keeps `original/` available as an existing fixture source, because the runtime smoke tests already choose `SAMPLE_GIF` from `original/pic/`
+    - copies `original/` into the container at `/work/original` as an existing fixture source, because the runtime smoke tests already choose `SAMPLE_GIF` from `original/pic/`
     - copies `safe/` into the container at `/work/safe`
     - installs Rust packaging/build dependencies
     - builds the local `.deb`s
@@ -718,9 +743,10 @@ The generated workflow derived from this plan must obey all of the following rul
   - Keep [`dependents.json`](/home/yans/code/safelibs/ported/giflib/dependents.json) unchanged; the harness must continue to validate exactly that downstream matrix.
 - `Verification`:
   - `check_07_package_build` must separately prove the runtime package ships the real versioned shared object plus `libgif.so.7`, and the development package ships `gif_lib.h`, `libgif.a`, `libgif.so`, `libgif7.pc`, and `libgif.pc`, while also proving that the extracted include trees contain only `gif_lib.h` and no private headers anywhere.
+  - `check_07_package_build` must also prove the Debian build stays library-only: exactly one `libgif7_*.deb`, exactly one `libgif-dev_*.deb`, and at most an optional `libgif7-dbgsym_*.deb`, with no `giflib-tools_*.deb` or other unexpected package artifacts.
   - `check_07_package_build` must compile [`original/tests/public_api_regress.c`](/home/yans/code/safelibs/ported/giflib/original/tests/public_api_regress.c) against the extracted `libgif-dev` header and extracted `libgif.a`, then run at least `legacy` and `alloc`, so the installed package header is verified as a real source-compatible development surface rather than only a copied file.
   - `check_07_package_build` must validate `libgif7.pc` and `libgif.pc` individually with host-isolated `pkg-config` queries against the extracted package tree. `libgif.pc` may be a regular file or a relative symlink to `libgif7.pc`, but it must not be an absolute symlink into `/usr/lib`.
-  - `check_07_downstream` must prove the harness no longer references `/usr/local`, `build_original_giflib`, or `assert_uses_original`, that it defines and uses the named helpers `build_safe_packages`, `install_safe_packages`, `resolve_installed_shared_libgif`, `resolve_installed_static_libgif`, `assert_links_to_active_shared_libgif`, and `assert_build_uses_active_giflib`, that every runtime label uses `assert_links_to_active_shared_libgif`, that every source-build label uses `assert_build_uses_active_giflib`, and that the captured `./test-original.sh` log contains the fixed labeled `ACTIVE_SHARED_*` markers for runtime labels plus `ACTIVE_SHARED_*`, `ACTIVE_STATIC_*`, and `LINK_ASSERT_MODE[...]` markers for every source-build label before the dependent matrix can count as downstream validation.
+  - `check_07_downstream` must prove the harness no longer references `/usr/local`, `build_original_giflib`, or `assert_uses_original`, that it copies `safe/` to `/work/safe` and `original/` to `/work/original`, that it defines and uses the named helpers `build_safe_packages`, `install_safe_packages`, `resolve_installed_shared_libgif`, `resolve_installed_static_libgif`, `assert_links_to_active_shared_libgif`, and `assert_build_uses_active_giflib`, that every runtime label uses `assert_links_to_active_shared_libgif`, that every source-build label uses `assert_build_uses_active_giflib`, and that the captured `./test-original.sh` log contains the fixed labeled `ACTIVE_SHARED_*` markers for runtime labels plus `ACTIVE_SHARED_*`, `ACTIVE_STATIC_*`, and `LINK_ASSERT_MODE[...]` markers for every source-build label before the dependent matrix can count as downstream validation.
   - `check_07_package_build` and `check_07_downstream` are both required and both bounce back to `impl_07_packaging`.
 
 ### Phase 8
@@ -760,9 +786,12 @@ The generated workflow derived from this plan must obey all of the following rul
           print("\n".join(violations), file=sys.stderr)
           sys.exit(1)
       PY
-      make -C original libgif.so libgif.a
+      original_build_dir="$(mktemp -d)"
+      trap 'rm -rf "$original_build_dir"' EXIT
+      cp -a original/. "$original_build_dir"
+      make -C "$original_build_dir" libgif.so libgif.a
       cargo build --manifest-path safe/Cargo.toml --release
-      cc -std=gnu99 -Wall -Wextra -I"$PWD/original" safe/tests/malformed_observe.c original/libgif.a -o /tmp/malformed_observe.original
+      cc -std=gnu99 -Wall -Wextra -I"$original_build_dir" safe/tests/malformed_observe.c "$original_build_dir/libgif.a" -o /tmp/malformed_observe.original
       safe/tests/capture_malformed_baseline.sh /tmp/malformed_observe.original "$PWD/safe/tests/malformed" > /tmp/original-malformed-baseline.txt
       diff -u safe/tests/malformed/original-baseline.txt /tmp/original-malformed-baseline.txt
       cmp -s safe/include/gif_lib.h original/gif_lib.h
@@ -779,7 +808,7 @@ The generated workflow derived from this plan must obey all of the following rul
       header_only_dir="$(mktemp -d)"
       make -C safe/tests ORIGINAL_INCLUDEDIR="$header_only_dir" ORIGINAL_TESTS_DIR="$PWD/original/tests" ORIGINAL_PIC_DIR="$PWD/original/pic" LIBGIF_INCLUDEDIR="$PWD/safe/include" LIBGIF_LIBDIR="$PWD/safe/target/release" safe-header-regress
       make -C safe/tests ORIGINAL_INCLUDEDIR="$PWD/original" ORIGINAL_TESTS_DIR="$PWD/original/tests" ORIGINAL_PIC_DIR="$PWD/original/pic" LIBGIF_INCLUDEDIR="$PWD/safe/include" LIBGIF_LIBDIR="$PWD/safe/target/release" test gif2rgb-regress malformed-regress malformed-baseline-regress link-compat-regress internal-export-regress
-      cc -std=gnu99 -Wall -Wextra -I"$PWD/original" original/tests/public_api_regress.c original/libgif.a -o /tmp/public_api_regress.original
+      cc -std=gnu99 -Wall -Wextra -I"$original_build_dir" "$original_build_dir/tests/public_api_regress.c" "$original_build_dir/libgif.a" -o /tmp/public_api_regress.original
       cc -std=gnu99 -Wall -Wextra -I"$PWD/original" original/tests/public_api_regress.c "$PWD/safe/target/release/libgif.a" -o /tmp/public_api_regress.safe
       safe/tests/perf_compare.sh /tmp/public_api_regress.original /tmp/public_api_regress.safe | tee /tmp/perf.log
       grep -E '^PERF workload=render-welcome2 .* threshold=2\.00$' /tmp/perf.log
@@ -794,9 +823,18 @@ The generated workflow derived from this plan must obey all of the following rul
       grep -x '3.0 (quilt)' safe/debian/source/format
       rm -f safe/../libgif7_*.deb safe/../libgif-dev_*.deb safe/../libgif7-dbgsym_*.deb
       (cd safe && dpkg-buildpackage -us -uc -b)
+      if find safe/.. -maxdepth 1 -type f -name '*.deb' ! -name 'libgif7_*.deb' ! -name 'libgif-dev_*.deb' ! -name 'libgif7-dbgsym_*.deb' | grep -q .; then
+        echo 'unexpected non-library Debian package artifact built from safe/' >&2
+        find safe/.. -maxdepth 1 -type f -name '*.deb' >&2
+        exit 1
+      fi
       multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
-      runtime_deb="$(ls -1 safe/../libgif7_*.deb)"
-      dev_deb="$(ls -1 safe/../libgif-dev_*.deb)"
+      runtime_matches="$(find safe/.. -maxdepth 1 -type f -name 'libgif7_*.deb' | LC_ALL=C sort)"
+      dev_matches="$(find safe/.. -maxdepth 1 -type f -name 'libgif-dev_*.deb' | LC_ALL=C sort)"
+      test "$(printf '%s\n' "$runtime_matches" | sed '/^$/d' | wc -l)" -eq 1
+      test "$(printf '%s\n' "$dev_matches" | sed '/^$/d' | wc -l)" -eq 1
+      runtime_deb="$(printf '%s\n' "$runtime_matches" | head -n1)"
+      dev_deb="$(printf '%s\n' "$dev_matches" | head -n1)"
       test "$(dpkg-deb -f "$runtime_deb" Package)" = "libgif7"
       test "$(dpkg-deb -f "$dev_deb" Package)" = "libgif-dev"
       runtime_version="$(dpkg-deb -f "$runtime_deb" Version)"
@@ -865,6 +903,7 @@ The generated workflow derived from this plan must obey all of the following rul
         exit 1
       fi
       rg -n '^COPY[[:space:]]+\\.?/?safe/?[[:space:]]+/work/safe/?$' test-original.sh
+      rg -n '^COPY[[:space:]]+\\.?/?original/?[[:space:]]+/work/original/?$' test-original.sh
       rg -n '^build_safe_packages\(\)' test-original.sh
       rg -n '^install_safe_packages\(\)' test-original.sh
       rg -n '^resolve_installed_shared_libgif\(\)' test-original.sh
@@ -978,12 +1017,13 @@ The generated workflow derived from this plan must obey all of the following rul
   - update `safe/debian/*` only if final package fixes are required
 - `Implementation Details`:
   - Remove any remaining bootstrap build logic from `safe/build.rs`, `safe/Cargo.toml`, and `safe/src/`. References to original fixtures, original headers, original tests, or the original baseline library are still allowed in `safe/tests/` and verification scripts.
+  - Rebuild any original-library oracle binaries needed for the final matrix from a temporary copy of [`original/`](/home/yans/code/safelibs/ported/giflib/original); do not run destructive build or cleanup flows in the tracked oracle tree.
   - Audit every `unsafe` block and keep only those required for FFI entry points, raw-pointer field access, callback invocation, libc allocation/deallocation, and symbol export. Each remaining `unsafe` site should have a succinct nearby `SAFETY:` justification comment.
   - Ensure exported Rust entry points do not unwind across the C ABI boundary. Wrap them so panics become `NULL`/`GIF_ERROR` and update error outputs instead of aborting.
   - Use this phase as the catch-all bounce target for any final ABI drift, downstream breakage, safety cleanups, or packaging mismatches found by later checkers.
 - `Verification`:
   - Run the full command block in `check_08_final`.
-  - Treat any bootstrap reference in the library build inputs, malformed-baseline drift, recursive vendored-fixture detection under `safe/tests/`, internal-export regression, symbol drift, layout drift, missing runtime-package or development-package files, missing local `+safelibs` package version suffix, widened package header surface, mismatch between built and active downstream package markers, unreviewed `unsafe`, performance regression beyond the agreed threshold, or downstream harness failure as a blocker.
+  - Treat any bootstrap reference in the library build inputs, malformed-baseline drift, recursive vendored-fixture detection under `safe/tests/`, internal-export regression, symbol drift, layout drift, unexpected non-library Debian package artifact, missing runtime-package or development-package files, missing local `+safelibs` package version suffix, widened package header surface, mismatch between built and active downstream package markers, unreviewed `unsafe`, performance regression beyond the agreed threshold, or downstream harness failure as a blocker.
 
 ## 4. Critical Files
 
@@ -999,7 +1039,7 @@ The generated workflow derived from this plan must obey all of the following rul
 - [`original/openbsd-reallocarray.c`](/home/yans/code/safelibs/ported/giflib/original/openbsd-reallocarray.c): exported overflow-safe allocation semantics.
 - [`original/quantize.c`](/home/yans/code/safelibs/ported/giflib/original/quantize.c): `GifQuantizeBuffer` implementation and deterministic ordering behavior.
 - [`original/debian/libgif7.symbols`](/home/yans/code/safelibs/ported/giflib/original/debian/libgif7.symbols): authoritative shared-library export list.
-- [`original/debian/control`](/home/yans/code/safelibs/ported/giflib/original/debian/control), [`original/debian/rules`](/home/yans/code/safelibs/ported/giflib/original/debian/rules), [`original/debian/libgif7.install`](/home/yans/code/safelibs/ported/giflib/original/debian/libgif7.install), [`original/debian/libgif-dev.install`](/home/yans/code/safelibs/ported/giflib/original/debian/libgif-dev.install), and [`original/debian/pkgconfig/libgif7.pc.in`](/home/yans/code/safelibs/ported/giflib/original/debian/pkgconfig/libgif7.pc.in): packaging templates to adapt for the safe build.
+- [`original/debian/control`](/home/yans/code/safelibs/ported/giflib/original/debian/control), [`original/debian/rules`](/home/yans/code/safelibs/ported/giflib/original/debian/rules), [`original/debian/libgif7.install`](/home/yans/code/safelibs/ported/giflib/original/debian/libgif7.install), [`original/debian/libgif-dev.install`](/home/yans/code/safelibs/ported/giflib/original/debian/libgif-dev.install), [`original/debian/pkgconfig/libgif7.pc.in`](/home/yans/code/safelibs/ported/giflib/original/debian/pkgconfig/libgif7.pc.in), and [`original/debian/source/format`](/home/yans/code/safelibs/ported/giflib/original/debian/source/format): packaging templates to adapt for the safe build.
 - [`original/tests/public_api_regress.c`](/home/yans/code/safelibs/ported/giflib/original/tests/public_api_regress.c): authoritative C regression harness and performance harness input, consumed in place by `safe/tests/Makefile`.
 - [`original/tests/makefile`](/home/yans/code/safelibs/ported/giflib/original/tests/makefile): authoritative regression-target structure to port into `safe/tests/Makefile`.
 - [`original/tests/`](/home/yans/code/safelibs/ported/giflib/original/tests) and [`original/pic/`](/home/yans/code/safelibs/ported/giflib/original/pic): authoritative fixtures and sample GIFs.
@@ -1066,14 +1106,17 @@ After all phases complete, verify the finished port with the following end-to-en
        sys.exit(1)
    PY
    ```
-2. Build both the original baseline library and the final Rust library:
+2. Build both the original baseline library and the final Rust library in the same shell you will use for steps 3 through 5:
    ```bash
-   make -C original libgif.so libgif.a
+   original_build_dir="$(mktemp -d)"
+   trap 'rm -rf "$original_build_dir"' EXIT
+   cp -a original/. "$original_build_dir"
+   make -C "$original_build_dir" libgif.so libgif.a
    cargo build --manifest-path safe/Cargo.toml --release
    ```
 3. Verify the committed malformed-input baseline artifact, public ABI layout, the full C regression matrix including the standalone `gif2rgb-regress` quantization gate, internal-export smoke coverage, and object-link compatibility:
    ```bash
-   cc -std=gnu99 -Wall -Wextra -I"$PWD/original" safe/tests/malformed_observe.c original/libgif.a -o /tmp/malformed_observe.original
+   cc -std=gnu99 -Wall -Wextra -I"$original_build_dir" safe/tests/malformed_observe.c "$original_build_dir/libgif.a" -o /tmp/malformed_observe.original
    safe/tests/capture_malformed_baseline.sh /tmp/malformed_observe.original "$PWD/safe/tests/malformed" > /tmp/original-malformed-baseline.txt
    diff -u safe/tests/malformed/original-baseline.txt /tmp/original-malformed-baseline.txt
    cmp -s safe/include/gif_lib.h original/gif_lib.h
@@ -1101,7 +1144,7 @@ After all phases complete, verify the finished port with the following end-to-en
    ```
 5. Verify performance against the original baseline:
    ```bash
-   cc -std=gnu99 -Wall -Wextra -I"$PWD/original" original/tests/public_api_regress.c original/libgif.a -o /tmp/public_api_regress.original
+   cc -std=gnu99 -Wall -Wextra -I"$original_build_dir" "$original_build_dir/tests/public_api_regress.c" "$original_build_dir/libgif.a" -o /tmp/public_api_regress.original
    cc -std=gnu99 -Wall -Wextra -I"$PWD/original" original/tests/public_api_regress.c "$PWD/safe/target/release/libgif.a" -o /tmp/public_api_regress.safe
    safe/tests/perf_compare.sh /tmp/public_api_regress.original /tmp/public_api_regress.safe | tee /tmp/perf.log
    grep -E '^PERF workload=render-welcome2 .* threshold=2\.00$' /tmp/perf.log
@@ -1114,9 +1157,18 @@ After all phases complete, verify the finished port with the following end-to-en
    grep -x '3.0 (quilt)' safe/debian/source/format
    rm -f safe/../libgif7_*.deb safe/../libgif-dev_*.deb safe/../libgif7-dbgsym_*.deb
    (cd safe && dpkg-buildpackage -us -uc -b)
+   if find safe/.. -maxdepth 1 -type f -name '*.deb' ! -name 'libgif7_*.deb' ! -name 'libgif-dev_*.deb' ! -name 'libgif7-dbgsym_*.deb' | grep -q .; then
+     echo 'unexpected non-library Debian package artifact built from safe/' >&2
+     find safe/.. -maxdepth 1 -type f -name '*.deb' >&2
+     exit 1
+   fi
    multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
-   runtime_deb="$(ls -1 safe/../libgif7_*.deb)"
-   dev_deb="$(ls -1 safe/../libgif-dev_*.deb)"
+   runtime_matches="$(find safe/.. -maxdepth 1 -type f -name 'libgif7_*.deb' | LC_ALL=C sort)"
+   dev_matches="$(find safe/.. -maxdepth 1 -type f -name 'libgif-dev_*.deb' | LC_ALL=C sort)"
+   test "$(printf '%s\n' "$runtime_matches" | sed '/^$/d' | wc -l)" -eq 1
+   test "$(printf '%s\n' "$dev_matches" | sed '/^$/d' | wc -l)" -eq 1
+   runtime_deb="$(printf '%s\n' "$runtime_matches" | head -n1)"
+   dev_deb="$(printf '%s\n' "$dev_matches" | head -n1)"
    test "$(dpkg-deb -f "$runtime_deb" Package)" = "libgif7"
    test "$(dpkg-deb -f "$dev_deb" Package)" = "libgif-dev"
    runtime_version="$(dpkg-deb -f "$runtime_deb" Version)"
@@ -1189,6 +1241,7 @@ After all phases complete, verify the finished port with the following end-to-en
      exit 1
    fi
    rg -n '^COPY[[:space:]]+\\.?/?safe/?[[:space:]]+/work/safe/?$' test-original.sh
+   rg -n '^COPY[[:space:]]+\\.?/?original/?[[:space:]]+/work/original/?$' test-original.sh
    rg -n '^build_safe_packages\(\)' test-original.sh
    rg -n '^install_safe_packages\(\)' test-original.sh
    rg -n '^resolve_installed_shared_libgif\(\)' test-original.sh
@@ -1296,5 +1349,5 @@ Success criteria:
 - the malformed-input regressions derived from [`relevant_cves.json`](/home/yans/code/safelibs/ported/giflib/relevant_cves.json) pass without crashes or panics
 - the performance comparison script passes its fixed `2.00` threshold on the exact workload IDs `render-welcome2`, `render-treescap-interlaced`, `highlevel-copy-fire`, and `rgb-to-gif-gifgrid`
 - every remaining `unsafe` site under `safe/src/` is justified with a nearby `SAFETY:` comment, and no unchecked unwind can cross the exported C ABI
-- Debian packages use a distinct local `+safelibs` version suffix, `safe/debian/source/format` is `3.0 (quilt)`, packages install the expected files and names with exactly one installed header file, `gif_lib.h`, no private headers anywhere in the extracted package trees, and individually valid `libgif7.pc` and `libgif.pc` entries verified through host-isolated `pkg-config` queries against the extracted package tree. `libgif.pc` is either a regular file or a relative symlink to `libgif7.pc`, never an absolute symlink into `/usr/lib`
-- the modified downstream Docker harness contains no `/usr/local` assumptions or original-install helpers, defines and uses `build_safe_packages`, `install_safe_packages`, `resolve_installed_shared_libgif`, `resolve_installed_static_libgif`, `assert_links_to_active_shared_libgif`, and `assert_build_uses_active_giflib`, uses `assert_links_to_active_shared_libgif` for every runtime label and `assert_build_uses_active_giflib` for every source-build label, logs matching built-versus-active package versions plus the fixed labeled `ACTIVE_SHARED_*` markers for runtime labels and `ACTIVE_SHARED_*`, `ACTIVE_STATIC_*`, and `LINK_ASSERT_MODE[...]` evidence for all five source-build labels, resolves runtime and development paths from package metadata plus `ldconfig`, and passes for every dependent listed in [`dependents.json`](/home/yans/code/safelibs/ported/giflib/dependents.json)
+- Debian packages use a distinct local `+safelibs` version suffix, `safe/debian/source/format` is `3.0 (quilt)`, the Debian build stays library-only with exactly one `libgif7_*.deb`, exactly one `libgif-dev_*.deb`, and at most an optional `libgif7-dbgsym_*.deb`, packages install the expected files and names with exactly one installed header file, `gif_lib.h`, no private headers anywhere in the extracted package trees, and individually valid `libgif7.pc` and `libgif.pc` entries verified through host-isolated `pkg-config` queries against the extracted package tree. `libgif.pc` is either a regular file or a relative symlink to `libgif7.pc`, never an absolute symlink into `/usr/lib`
+- the modified downstream Docker harness contains no `/usr/local` assumptions or original-install helpers, copies `safe/` to `/work/safe` and `original/` to `/work/original`, defines and uses `build_safe_packages`, `install_safe_packages`, `resolve_installed_shared_libgif`, `resolve_installed_static_libgif`, `assert_links_to_active_shared_libgif`, and `assert_build_uses_active_giflib`, uses `assert_links_to_active_shared_libgif` for every runtime label and `assert_build_uses_active_giflib` for every source-build label, logs matching built-versus-active package versions plus the fixed labeled `ACTIVE_SHARED_*` markers for runtime labels and `ACTIVE_SHARED_*`, `ACTIVE_STATIC_*`, and `LINK_ASSERT_MODE[...]` evidence for all five source-build labels, resolves runtime and development paths from package metadata plus `ldconfig`, and passes for every dependent listed in [`dependents.json`](/home/yans/code/safelibs/ported/giflib/dependents.json)
