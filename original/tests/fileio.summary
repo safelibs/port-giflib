@@ -1,0 +1,2 @@
+name writer=GIF87a reader=GIF87a size=2x1 pixels=01
+handle writer=GIF89a reader=GIF89a size=1x2 pixels=10

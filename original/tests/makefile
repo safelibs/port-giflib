@@ -25,10 +25,14 @@ test: public_api_regress \
 	render-regress \
 	gifbuild-regress \
 	gifclrmp-regress \
+	legacy-regress \
+	fileio-regress \
+	alloc-regress \
 	gifecho-regress \
 	giffilter-regress \
 	giffix-regress \
 	gifsponge-regress \
+	drawing-regress \
 	giftext-regress \
 	giftool-regress \
 	gifwedge-regress
@@ -39,7 +43,11 @@ rebuild: public_api_regress \
 	gif2rgb-rebuild \
 	gifbuild-rebuild \
 	gifclrmp-rebuild \
+	legacy-rebuild \
+	fileio-rebuild \
+	alloc-rebuild \
 	gifecho-rebuild \
+	drawing-rebuild \
 	giftext-rebuild \
 	gifwedge-rebuild
 
@@ -102,6 +110,30 @@ gifclrmp-rebuild: public_api_regress
 		$(APITEST) map $${test} >$${stem}.map; \
 	done
 
+legacy-regress: public_api_regress
+	@echo "public api: Checking sequential legacy helpers."
+	@$(APITEST) legacy | diff -u legacy.summary -
+
+legacy-rebuild: public_api_regress
+	@echo "Rebuilding legacy API fixture."
+	@$(APITEST) legacy >legacy.summary
+
+fileio-regress: public_api_regress
+	@echo "public api: Checking file name and handle wrappers."
+	@$(APITEST) fileio | diff -u fileio.summary -
+
+fileio-rebuild: public_api_regress
+	@echo "Rebuilding file I/O fixture."
+	@$(APITEST) fileio >fileio.summary
+
+alloc-regress: public_api_regress
+	@echo "public api: Checking allocation, translation, and GCB helpers."
+	@$(APITEST) alloc | diff -u alloc.summary -
+
+alloc-rebuild: public_api_regress
+	@echo "Rebuilding allocation helper fixture."
+	@$(APITEST) alloc >alloc.summary
+
 gifecho-regress: public_api_regress
 	@echo "gifecho: Testing public text rendering behavior"
 	@$(APITEST) generate foobar | $(APITEST) icon - | diff -u foobar.ico -
@@ -109,6 +141,14 @@ gifecho-regress: public_api_regress
 gifecho-rebuild: public_api_regress
 	@echo "Rebuilding gifecho fixture."
 	@$(APITEST) generate foobar | $(APITEST) icon - >foobar.ico
+
+drawing-regress: public_api_regress
+	@echo "public api: Checking drawing helpers."
+	@$(APITEST) generate drawing | $(APITEST) icon - | diff -u drawing.ico -
+
+drawing-rebuild: public_api_regress
+	@echo "Rebuilding drawing helper fixture."
+	@$(APITEST) generate drawing | $(APITEST) icon - >drawing.ico
 
 giffilter-regress: public_api_regress
 	@for test in $(GIFS); \

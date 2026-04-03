@@ -1,0 +1,6 @@
+writer_version GIF87a -> GIF89a
+reader_version GIF89a
+comment seq-public
+image 0,0 2x2 interlace=0
+pixel_calls 4 terminate=yes
+lz_codes 4 1 -1 terminate=yes

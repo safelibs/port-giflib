@@ -1,11 +1,13 @@
 #define _GNU_SOURCE
 
 #include <ctype.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "gif_lib.h"
 
@@ -41,11 +43,18 @@ static const char *gif_error_string_or_default(int error_code);
 static void *xmalloc(size_t size);
 static void *xcalloc(size_t count, size_t size);
 static void *xrealloc(void *ptr, size_t size);
+static FILE *xopen_memstream(char **data, size_t *len);
 static void buffer_append(Buffer *buf, const void *data, size_t len);
 static void buffer_free(Buffer *buf);
 static Buffer read_stream(FILE *stream);
 static Buffer read_input(const char *path);
 static void write_stdout(const Buffer *buf);
+static ColorMapObject *make_monochrome_map(void);
+static void encode_monochrome_image(GifFileType *gif, int width, int height,
+                                    const GifPixelType *pixels,
+                                    bool force_gif89, const char *comment,
+                                    bool use_pixels);
+static void print_saved_image_pixels(FILE *out, const SavedImage *image);
 static int memory_read(GifFileType *gif, GifByteType *dst, int len);
 static int memory_write(GifFileType *gif, const GifByteType *src, int len);
 static void free_screen_buffer(GifRowType *screen, int height);
@@ -68,7 +77,11 @@ static Buffer highlevel_copy(const Buffer *input, bool set_interlace,
                              bool interlace_value);
 static Buffer rgb_to_gif(const Buffer *input, int exp_num_colors,
                          int width, int height);
+static Buffer summarize_legacy_api_coverage(void);
+static Buffer summarize_file_api_coverage(void);
+static Buffer summarize_alloc_api_coverage(void);
 static Buffer generate_foobar(void);
+static Buffer generate_drawing(void);
 static Buffer generate_wedge(void);
 static bool malformed_input_is_rejected(const Buffer *input);
 static void draw_text_line_with_public_font(SavedImage *image,
@@ -79,7 +92,8 @@ static void usage(void) {
 	fprintf(stderr,
 	        "usage: public_api_regress "
 	        "{render|map|dump|icon|lowlevel-copy|repair|highlevel-copy|"
-	        "interlace|rgb-to-gif|generate|malformed} [args]\n");
+	        "interlace|rgb-to-gif|legacy|fileio|alloc|generate|"
+	        "malformed} [args]\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -127,6 +141,16 @@ static void *xrealloc(void *ptr, size_t size) {
 	}
 
 	return new_ptr;
+}
+
+static FILE *xopen_memstream(char **data, size_t *len) {
+	FILE *stream = open_memstream(data, len);
+
+	if (stream == NULL) {
+		fatal("open_memstream failed");
+	}
+
+	return stream;
 }
 
 static void buffer_append(Buffer *buf, const void *data, size_t len) {
@@ -203,6 +227,88 @@ static void write_stdout(const Buffer *buf) {
 
 	if (fwrite(buf->data, 1, buf->len, stdout) != buf->len) {
 		fatal("failed to write output");
+	}
+}
+
+static ColorMapObject *make_monochrome_map(void) {
+	ColorMapObject *color_map = GifMakeMapObject(2, NULL);
+
+	if (color_map == NULL) {
+		fatal("GifMakeMapObject failed");
+	}
+
+	color_map->Colors[0].Red = 0;
+	color_map->Colors[0].Green = 0;
+	color_map->Colors[0].Blue = 0;
+	color_map->Colors[1].Red = 255;
+	color_map->Colors[1].Green = 255;
+	color_map->Colors[1].Blue = 255;
+
+	return color_map;
+}
+
+static void encode_monochrome_image(GifFileType *gif, int width, int height,
+                                    const GifPixelType *pixels,
+                                    bool force_gif89, const char *comment,
+                                    bool use_pixels) {
+	ColorMapObject *color_map = make_monochrome_map();
+	int i;
+
+	if (force_gif89) {
+		EGifSetGifVersion(gif, true);
+	}
+	if (EGifPutScreenDesc(gif, width, height, 1, 0, color_map) ==
+	    GIF_ERROR) {
+		GifFreeMapObject(color_map);
+		fatal("EGifPutScreenDesc failed: %s",
+		      gif_error_string_or_default(gif->Error));
+	}
+	if (comment != NULL &&
+	    EGifPutComment(gif, comment) == GIF_ERROR) {
+		GifFreeMapObject(color_map);
+		fatal("EGifPutComment failed: %s",
+		      gif_error_string_or_default(gif->Error));
+	}
+	if (EGifPutImageDesc(gif, 0, 0, width, height, false, NULL) ==
+	    GIF_ERROR) {
+		GifFreeMapObject(color_map);
+		fatal("EGifPutImageDesc failed: %s",
+		      gif_error_string_or_default(gif->Error));
+	}
+
+	if (use_pixels) {
+		for (i = 0; i < width * height; i++) {
+			if (EGifPutPixel(gif, pixels[i]) == GIF_ERROR) {
+				GifFreeMapObject(color_map);
+				fatal("EGifPutPixel failed: %s",
+				      gif_error_string_or_default(gif->Error));
+			}
+		}
+	} else {
+		GifPixelType *row = xmalloc((size_t)width * sizeof(GifPixelType));
+
+		for (i = 0; i < height; i++) {
+			memcpy(row, pixels + i * width,
+			       (size_t)width * sizeof(GifPixelType));
+			if (EGifPutLine(gif, row, width) == GIF_ERROR) {
+				free(row);
+				GifFreeMapObject(color_map);
+				fatal("EGifPutLine failed: %s",
+				      gif_error_string_or_default(gif->Error));
+			}
+		}
+		free(row);
+	}
+
+	GifFreeMapObject(color_map);
+}
+
+static void print_saved_image_pixels(FILE *out, const SavedImage *image) {
+	int count = image->ImageDesc.Width * image->ImageDesc.Height;
+	int i;
+
+	for (i = 0; i < count; i++) {
+		(void)fprintf(out, "%d", image->RasterBits[i]);
 	}
 }
 
@@ -1655,6 +1761,535 @@ static Buffer rgb_to_gif(const Buffer *input, int exp_num_colors,
 	return out;
 }
 
+static Buffer summarize_legacy_api_coverage(void) {
+	static const GifPixelType seq_pixels[] = {0, 1, 1, 0};
+	static const GifPixelType lz_pixel[] = {1};
+	const char comment_text[] = "seq-public";
+	Buffer gif_data = {0};
+	Buffer lz_data = {0};
+	Buffer out = {0};
+	GifFileType *writer;
+	GifFileType *reader;
+	MemoryReader memory_reader;
+	char *text = NULL;
+	size_t text_len = 0;
+	FILE *stream;
+	int error_code = 0;
+	GifRecordType record_type;
+	GifByteType *extension = NULL;
+	int ext_code;
+	size_t comment_len = 0;
+	char comment[64];
+	int pixel_calls = 0;
+	int code;
+	bool terminated = false;
+
+	writer = EGifOpen(&gif_data, memory_write, &error_code);
+	if (writer == NULL) {
+		fatal("EGifOpen failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+
+	stream = xopen_memstream(&text, &text_len);
+	(void)fprintf(stream, "writer_version %s",
+	              EGifGetGifVersion(writer));
+	EGifSetGifVersion(writer, true);
+	(void)fprintf(stream, " -> %s\n", EGifGetGifVersion(writer));
+
+	encode_monochrome_image(writer, 2, 2, seq_pixels, false, comment_text,
+	                        true);
+	if (EGifCloseFile(writer, &error_code) == GIF_ERROR) {
+		buffer_free(&gif_data);
+		fatal("EGifCloseFile failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+
+	memory_reader.data = gif_data.data;
+	memory_reader.len = gif_data.len;
+	memory_reader.pos = 0;
+	reader = DGifOpen(&memory_reader, memory_read, &error_code);
+	if (reader == NULL) {
+		buffer_free(&gif_data);
+		fatal("DGifOpen failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+
+	(void)fprintf(stream, "reader_version %s\n",
+	              DGifGetGifVersion(reader));
+
+	if (DGifGetRecordType(reader, &record_type) == GIF_ERROR ||
+	    record_type != EXTENSION_RECORD_TYPE) {
+		(void)DGifCloseFile(reader, NULL);
+		buffer_free(&gif_data);
+		fatal("expected comment extension");
+	}
+	if (DGifGetExtension(reader, &ext_code, &extension) == GIF_ERROR) {
+		(void)DGifCloseFile(reader, NULL);
+		buffer_free(&gif_data);
+		fatal("DGifGetExtension failed: %s",
+		      gif_error_string_or_default(reader->Error));
+	}
+	if (ext_code != COMMENT_EXT_FUNC_CODE) {
+		(void)DGifCloseFile(reader, NULL);
+		buffer_free(&gif_data);
+		fatal("expected comment extension, got %d", ext_code);
+	}
+	while (extension != NULL) {
+		if (comment_len + extension[0] >= sizeof(comment)) {
+			(void)DGifCloseFile(reader, NULL);
+			buffer_free(&gif_data);
+			fatal("comment buffer too small");
+		}
+		memcpy(comment + comment_len, extension + 1, extension[0]);
+		comment_len += extension[0];
+		if (DGifGetExtensionNext(reader, &extension) == GIF_ERROR) {
+			(void)DGifCloseFile(reader, NULL);
+			buffer_free(&gif_data);
+			fatal("DGifGetExtensionNext failed: %s",
+			      gif_error_string_or_default(reader->Error));
+		}
+	}
+	comment[comment_len] = '\0';
+	(void)fprintf(stream, "comment %s\n", comment);
+
+	if (DGifGetRecordType(reader, &record_type) == GIF_ERROR ||
+	    record_type != IMAGE_DESC_RECORD_TYPE) {
+		(void)DGifCloseFile(reader, NULL);
+		buffer_free(&gif_data);
+		fatal("expected image descriptor");
+	}
+	if (DGifGetImageHeader(reader) == GIF_ERROR) {
+		(void)DGifCloseFile(reader, NULL);
+		buffer_free(&gif_data);
+		fatal("DGifGetImageHeader failed: %s",
+		      gif_error_string_or_default(reader->Error));
+	}
+	(void)fprintf(stream, "image %d,%d %dx%d interlace=%d\n",
+	              reader->Image.Left, reader->Image.Top,
+	              reader->Image.Width, reader->Image.Height,
+	              reader->Image.Interlace ? 1 : 0);
+	for (pixel_calls = 0; pixel_calls < 4; pixel_calls++) {
+		if (DGifGetPixel(reader, 0) == GIF_ERROR) {
+			(void)DGifCloseFile(reader, NULL);
+			buffer_free(&gif_data);
+			fatal("DGifGetPixel failed: %s",
+			      gif_error_string_or_default(reader->Error));
+		}
+	}
+	if (DGifGetRecordType(reader, &record_type) == GIF_ERROR) {
+		(void)DGifCloseFile(reader, NULL);
+		buffer_free(&gif_data);
+		fatal("DGifGetRecordType failed after pixels: %s",
+		      gif_error_string_or_default(reader->Error));
+	}
+	terminated = record_type == TERMINATE_RECORD_TYPE;
+	(void)fprintf(stream, "pixel_calls %d terminate=%s\n",
+	              pixel_calls, terminated ? "yes" : "no");
+	if (DGifCloseFile(reader, &error_code) == GIF_ERROR) {
+		buffer_free(&gif_data);
+		fatal("DGifCloseFile failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+	buffer_free(&gif_data);
+
+	writer = EGifOpen(&lz_data, memory_write, &error_code);
+	if (writer == NULL) {
+		free(text);
+		fatal("EGifOpen failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+	encode_monochrome_image(writer, 1, 1, lz_pixel, false, NULL, true);
+	if (EGifCloseFile(writer, &error_code) == GIF_ERROR) {
+		buffer_free(&lz_data);
+		free(text);
+		fatal("EGifCloseFile failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+
+	memory_reader.data = lz_data.data;
+	memory_reader.len = lz_data.len;
+	memory_reader.pos = 0;
+	reader = DGifOpen(&memory_reader, memory_read, &error_code);
+	if (reader == NULL) {
+		buffer_free(&lz_data);
+		free(text);
+		fatal("DGifOpen failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+	if (DGifGetRecordType(reader, &record_type) == GIF_ERROR ||
+	    record_type != IMAGE_DESC_RECORD_TYPE) {
+		(void)DGifCloseFile(reader, NULL);
+		buffer_free(&lz_data);
+		free(text);
+		fatal("expected image descriptor before LZ codes");
+	}
+	if (DGifGetImageHeader(reader) == GIF_ERROR) {
+		(void)DGifCloseFile(reader, NULL);
+		buffer_free(&lz_data);
+		free(text);
+		fatal("DGifGetImageHeader failed: %s",
+		      gif_error_string_or_default(reader->Error));
+	}
+
+	(void)fprintf(stream, "lz_codes");
+	do {
+		if (DGifGetLZCodes(reader, &code) == GIF_ERROR) {
+			(void)DGifCloseFile(reader, NULL);
+			buffer_free(&lz_data);
+			free(text);
+			fatal("DGifGetLZCodes failed: %s",
+			      gif_error_string_or_default(reader->Error));
+		}
+		(void)fprintf(stream, " %d", code);
+	} while (code != -1);
+	if (DGifGetRecordType(reader, &record_type) == GIF_ERROR) {
+		(void)DGifCloseFile(reader, NULL);
+		buffer_free(&lz_data);
+		free(text);
+		fatal("DGifGetRecordType failed after LZ codes: %s",
+		      gif_error_string_or_default(reader->Error));
+	}
+	(void)fprintf(stream, " terminate=%s\n",
+	              record_type == TERMINATE_RECORD_TYPE ? "yes" : "no");
+	if (DGifCloseFile(reader, &error_code) == GIF_ERROR) {
+		buffer_free(&lz_data);
+		free(text);
+		fatal("DGifCloseFile failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+	buffer_free(&lz_data);
+
+	if (fclose(stream) != 0) {
+		free(text);
+		fatal("failed to finalize summary output");
+	}
+	out.data = (unsigned char *)text;
+	out.len = text_len;
+	out.cap = text_len;
+
+	return out;
+}
+
+static Buffer summarize_file_api_coverage(void) {
+	static const GifPixelType name_pixels[] = {0, 1};
+	static const GifPixelType handle_pixels[] = {1, 0};
+	char name_template[] = "/tmp/giflib-name-XXXXXX";
+	char handle_template[] = "/tmp/giflib-handle-XXXXXX";
+	GifFileType *writer;
+	GifFileType *reader;
+	Buffer out = {0};
+	char *text = NULL;
+	size_t text_len = 0;
+	FILE *stream = xopen_memstream(&text, &text_len);
+	int error_code = 0;
+	int fd;
+
+	fd = mkstemp(name_template);
+	if (fd < 0) {
+		fclose(stream);
+		free(text);
+		fatal("mkstemp failed for name test");
+	}
+	if (close(fd) != 0) {
+		fclose(stream);
+		free(text);
+		(void)unlink(name_template);
+		fatal("close failed for name test");
+	}
+
+	writer = EGifOpenFileName(name_template, false, &error_code);
+	if (writer == NULL) {
+		fclose(stream);
+		free(text);
+		(void)unlink(name_template);
+		fatal("EGifOpenFileName failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+	(void)fprintf(stream, "name writer=%s",
+	              EGifGetGifVersion(writer));
+	encode_monochrome_image(writer, 2, 1, name_pixels, false, NULL,
+	                        false);
+	if (EGifCloseFile(writer, &error_code) == GIF_ERROR) {
+		fclose(stream);
+		free(text);
+		(void)unlink(name_template);
+		fatal("EGifCloseFile failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+
+	reader = DGifOpenFileName(name_template, &error_code);
+	if (reader == NULL) {
+		fclose(stream);
+		free(text);
+		(void)unlink(name_template);
+		fatal("DGifOpenFileName failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+	if (DGifSlurp(reader) == GIF_ERROR) {
+		(void)DGifCloseFile(reader, NULL);
+		fclose(stream);
+		free(text);
+		(void)unlink(name_template);
+		fatal("DGifSlurp failed: %s",
+		      gif_error_string_or_default(reader->Error));
+	}
+	(void)fprintf(stream, " reader=%s size=%dx%d pixels=",
+	              DGifGetGifVersion(reader), reader->SWidth,
+	              reader->SHeight);
+	print_saved_image_pixels(stream, &reader->SavedImages[0]);
+	(void)fputc('\n', stream);
+	if (DGifCloseFile(reader, &error_code) == GIF_ERROR) {
+		fclose(stream);
+		free(text);
+		(void)unlink(name_template);
+		fatal("DGifCloseFile failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+	if (unlink(name_template) != 0) {
+		fclose(stream);
+		free(text);
+		fatal("unlink failed for name test");
+	}
+
+	fd = mkstemp(handle_template);
+	if (fd < 0) {
+		fclose(stream);
+		free(text);
+		fatal("mkstemp failed for handle test");
+	}
+
+	writer = EGifOpenFileHandle(fd, &error_code);
+	if (writer == NULL) {
+		fclose(stream);
+		free(text);
+		(void)close(fd);
+		(void)unlink(handle_template);
+		fatal("EGifOpenFileHandle failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+	EGifSetGifVersion(writer, true);
+	(void)fprintf(stream, "handle writer=%s",
+	              EGifGetGifVersion(writer));
+	encode_monochrome_image(writer, 1, 2, handle_pixels, false, NULL,
+	                        false);
+	if (EGifCloseFile(writer, &error_code) == GIF_ERROR) {
+		fclose(stream);
+		free(text);
+		(void)unlink(handle_template);
+		fatal("EGifCloseFile failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+
+	fd = open(handle_template, O_RDONLY);
+	if (fd < 0) {
+		fclose(stream);
+		free(text);
+		(void)unlink(handle_template);
+		fatal("open failed for handle test");
+	}
+	reader = DGifOpenFileHandle(fd, &error_code);
+	if (reader == NULL) {
+		fclose(stream);
+		free(text);
+		(void)close(fd);
+		(void)unlink(handle_template);
+		fatal("DGifOpenFileHandle failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+	if (DGifSlurp(reader) == GIF_ERROR) {
+		(void)DGifCloseFile(reader, NULL);
+		fclose(stream);
+		free(text);
+		(void)unlink(handle_template);
+		fatal("DGifSlurp failed: %s",
+		      gif_error_string_or_default(reader->Error));
+	}
+	(void)fprintf(stream, " reader=%s size=%dx%d pixels=",
+	              DGifGetGifVersion(reader), reader->SWidth,
+	              reader->SHeight);
+	print_saved_image_pixels(stream, &reader->SavedImages[0]);
+	(void)fputc('\n', stream);
+	if (DGifCloseFile(reader, &error_code) == GIF_ERROR) {
+		fclose(stream);
+		free(text);
+		(void)unlink(handle_template);
+		fatal("DGifCloseFile failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+	if (unlink(handle_template) != 0) {
+		fclose(stream);
+		free(text);
+		fatal("unlink failed for handle test");
+	}
+
+	if (fclose(stream) != 0) {
+		free(text);
+		fatal("failed to finalize file API summary");
+	}
+	out.data = (unsigned char *)text;
+	out.len = text_len;
+	out.cap = text_len;
+
+	return out;
+}
+
+static Buffer summarize_alloc_api_coverage(void) {
+	static const GifColorType first_colors[] = {
+	    {255, 0, 0},
+	    {0, 255, 0},
+	};
+	static const GifColorType second_colors[] = {
+	    {0, 255, 0},
+	    {0, 0, 255},
+	};
+	static const GifPixelType initial_raster[] = {0, 1, 1, 0};
+	static const unsigned char ext_data[] = {'o', 'k'};
+	Buffer out = {0};
+	char *text = NULL;
+	size_t text_len = 0;
+	FILE *stream = xopen_memstream(&text, &text_len);
+	ColorMapObject *first = GifMakeMapObject(2, first_colors);
+	ColorMapObject *second = GifMakeMapObject(2, second_colors);
+	ColorMapObject *combined;
+	GifPixelType translation[256] = {0};
+	SavedImage translated = {0};
+	GraphicsControlBlock gcb = {DISPOSE_PREVIOUS, true, 25, 7};
+	GraphicsControlBlock direct = {0};
+	GraphicsControlBlock saved = {0};
+	GifByteType gcb_bytes[4];
+	GifFileType gif = {0};
+	ExtensionBlock *extension_blocks = NULL;
+	int extension_count = 0;
+	int i;
+
+	if (first == NULL || second == NULL) {
+		GifFreeMapObject(first);
+		GifFreeMapObject(second);
+		fclose(stream);
+		free(text);
+		fatal("GifMakeMapObject failed");
+	}
+
+	combined = GifUnionColorMap(first, second, translation);
+	if (combined == NULL) {
+		GifFreeMapObject(first);
+		GifFreeMapObject(second);
+		fclose(stream);
+		free(text);
+		fatal("GifUnionColorMap failed");
+	}
+
+	translated.ImageDesc.Width = 4;
+	translated.ImageDesc.Height = 1;
+	translated.RasterBits = xmalloc(sizeof(initial_raster));
+	memcpy(translated.RasterBits, initial_raster, sizeof(initial_raster));
+	GifApplyTranslation(&translated, translation);
+
+	(void)fprintf(stream, "bits 2=%d 3=%d 17=%d\n", GifBitSize(2),
+	              GifBitSize(3), GifBitSize(17));
+	(void)fprintf(stream,
+	              "union count=%d bits=%d trans=%d,%d raster=",
+	              combined->ColorCount, combined->BitsPerPixel,
+	              translation[0], translation[1]);
+	for (i = 0; i < translated.ImageDesc.Width; i++) {
+		(void)fprintf(stream, "%d", translated.RasterBits[i]);
+	}
+	(void)fputc('\n', stream);
+
+	if (EGifGCBToExtension(&gcb, gcb_bytes) != 4) {
+		free(translated.RasterBits);
+		GifFreeMapObject(first);
+		GifFreeMapObject(second);
+		GifFreeMapObject(combined);
+		fclose(stream);
+		free(text);
+		fatal("EGifGCBToExtension returned an unexpected length");
+	}
+	if (DGifExtensionToGCB(4, gcb_bytes, &direct) == GIF_ERROR) {
+		free(translated.RasterBits);
+		GifFreeMapObject(first);
+		GifFreeMapObject(second);
+		GifFreeMapObject(combined);
+		fclose(stream);
+		free(text);
+		fatal("DGifExtensionToGCB failed");
+	}
+	if (GifMakeSavedImage(&gif, NULL) == NULL) {
+		free(translated.RasterBits);
+		GifFreeMapObject(first);
+		GifFreeMapObject(second);
+		GifFreeMapObject(combined);
+		fclose(stream);
+		free(text);
+		fatal("GifMakeSavedImage failed");
+	}
+	if (EGifGCBToSavedExtension(&gcb, &gif, 0) == GIF_ERROR) {
+		free(translated.RasterBits);
+		GifFreeMapObject(first);
+		GifFreeMapObject(second);
+		GifFreeMapObject(combined);
+		GifFreeSavedImages(&gif);
+		fclose(stream);
+		free(text);
+		fatal("EGifGCBToSavedExtension failed");
+	}
+	if (DGifSavedExtensionToGCB(&gif, 0, &saved) == GIF_ERROR) {
+		free(translated.RasterBits);
+		GifFreeMapObject(first);
+		GifFreeMapObject(second);
+		GifFreeMapObject(combined);
+		GifFreeSavedImages(&gif);
+		fclose(stream);
+		free(text);
+		fatal("DGifSavedExtensionToGCB failed");
+	}
+	(void)fprintf(stream,
+	              "gcb bytes=%02x%02x%02x%02x direct=%d,%d,%d,%d "
+	              "saved=%d,%d,%d,%d count=%d\n",
+	              gcb_bytes[0], gcb_bytes[1], gcb_bytes[2],
+	              gcb_bytes[3], direct.DisposalMode,
+	              direct.UserInputFlag ? 1 : 0, direct.DelayTime,
+	              direct.TransparentColor, saved.DisposalMode,
+	              saved.UserInputFlag ? 1 : 0, saved.DelayTime,
+	              saved.TransparentColor,
+	              gif.SavedImages[0].ExtensionBlockCount);
+
+	if (GifAddExtensionBlock(&extension_count, &extension_blocks,
+	                         COMMENT_EXT_FUNC_CODE,
+	                         (unsigned int)sizeof(ext_data),
+	                         (unsigned char *)ext_data) == GIF_ERROR) {
+		free(translated.RasterBits);
+		GifFreeMapObject(first);
+		GifFreeMapObject(second);
+		GifFreeMapObject(combined);
+		GifFreeSavedImages(&gif);
+		fclose(stream);
+		free(text);
+		fatal("GifAddExtensionBlock failed");
+	}
+	GifFreeExtensions(&extension_count, &extension_blocks);
+	GifFreeSavedImages(&gif);
+	(void)fprintf(stream, "free extensions=%d,%s saved_images=%s\n",
+	              extension_count,
+	              extension_blocks == NULL ? "null" : "set",
+	              gif.SavedImages == NULL ? "null" : "set");
+
+	free(translated.RasterBits);
+	GifFreeMapObject(first);
+	GifFreeMapObject(second);
+	GifFreeMapObject(combined);
+
+	if (fclose(stream) != 0) {
+		free(text);
+		fatal("failed to finalize allocation summary");
+	}
+	out.data = (unsigned char *)text;
+	out.len = text_len;
+	out.cap = text_len;
+
+	return out;
+}
+
 static Buffer generate_foobar(void) {
 	const char text[] = "foobar";
 	Buffer out = {0};
@@ -1701,6 +2336,67 @@ static Buffer generate_foobar(void) {
 	image->RasterBits = xcalloc((size_t)gif->SWidth * gif->SHeight,
 	                            sizeof(GifByteType));
 	draw_text_line_with_public_font(image, text, 1);
+
+	if (EGifSpew(gif) == GIF_ERROR) {
+		buffer_free(&out);
+		fatal("EGifSpew failed: %s",
+		      gif_error_string_or_default(gif->Error));
+	}
+
+	return out;
+}
+
+static Buffer generate_drawing(void) {
+	Buffer out = {0};
+	GifFileType *gif;
+	SavedImage *image;
+	int error_code = 0;
+
+	gif = EGifOpen(&out, memory_write, &error_code);
+	if (gif == NULL) {
+		fatal("EGifOpen failed: %s",
+		      gif_error_string_or_default(error_code));
+	}
+
+	gif->SWidth = 20;
+	gif->SHeight = 18;
+	gif->SBackGroundColor = 0;
+	gif->AspectByte = 0;
+	gif->SColorMap = GifMakeMapObject(8, NULL);
+	if (gif->SColorMap == NULL) {
+		(void)EGifCloseFile(gif, NULL);
+		buffer_free(&out);
+		fatal("GifMakeMapObject failed");
+	}
+	gif->SColorResolution = gif->SColorMap->BitsPerPixel;
+	gif->SColorMap->Colors[0] = (GifColorType){0, 0, 0};
+	gif->SColorMap->Colors[1] = (GifColorType){255, 255, 255};
+	gif->SColorMap->Colors[2] = (GifColorType){255, 0, 0};
+	gif->SColorMap->Colors[3] = (GifColorType){0, 255, 0};
+	gif->SColorMap->Colors[4] = (GifColorType){0, 0, 255};
+	gif->SColorMap->Colors[5] = (GifColorType){255, 255, 0};
+	gif->SColorMap->Colors[6] = (GifColorType){0, 255, 255};
+	gif->SColorMap->Colors[7] = (GifColorType){255, 0, 255};
+
+	image = GifMakeSavedImage(gif, NULL);
+	if (image == NULL) {
+		(void)EGifCloseFile(gif, NULL);
+		buffer_free(&out);
+		fatal("GifMakeSavedImage failed");
+	}
+	image->ImageDesc.Left = 0;
+	image->ImageDesc.Top = 0;
+	image->ImageDesc.Width = gif->SWidth;
+	image->ImageDesc.Height = gif->SHeight;
+	image->ImageDesc.Interlace = false;
+	image->ImageDesc.ColorMap = NULL;
+	image->RasterBits = xcalloc((size_t)gif->SWidth * gif->SHeight,
+	                            sizeof(GifByteType));
+
+	GifDrawRectangle(image, 1, 1, 5, 3, 1);
+	GifDrawBox(image, 7, 1, 5, 3, 2);
+	GifDrawText8x8(image, 0, 6, "A", 3);
+	GifDrawBoxedText8x8(image, 9, 6, "\tZ", 1, 4, 5);
 
 	if (EGifSpew(gif) == GIF_ERROR) {
 		buffer_free(&out);
@@ -1914,12 +2610,23 @@ int main(int argc, char **argv) {
 		input = read_input(argc >= 6 ? argv[5] : "-");
 		output = rgb_to_gif(&input, exp_num_colors, width, height);
 		write_stdout(&output);
+	} else if (strcmp(argv[1], "legacy") == 0) {
+		output = summarize_legacy_api_coverage();
+		write_stdout(&output);
+	} else if (strcmp(argv[1], "fileio") == 0) {
+		output = summarize_file_api_coverage();
+		write_stdout(&output);
+	} else if (strcmp(argv[1], "alloc") == 0) {
+		output = summarize_alloc_api_coverage();
+		write_stdout(&output);
 	} else if (strcmp(argv[1], "generate") == 0) {
 		if (argc < 3) {
 			usage();
 		}
 		if (strcmp(argv[2], "foobar") == 0) {
 			output = generate_foobar();
+		} else if (strcmp(argv[2], "drawing") == 0) {
+			output = generate_drawing();
 		} else if (strcmp(argv[2], "wedge") == 0) {
 			output = generate_wedge();
 		} else {
