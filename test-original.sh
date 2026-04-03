@@ -42,6 +42,7 @@ RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.s
       jq \
       libcamlimages-ocaml \
       libcamlimages-ocaml-dev \
+      libextractor-plugin-gif \
       libtool \
       mtpaint \
       ocaml-findlib \
@@ -220,6 +221,7 @@ assert_runtime_linkage() {
   assert_uses_original /usr/bin/fbi /tmp/ldd-fbi.log
   assert_uses_original /usr/bin/mtpaint /tmp/ldd-mtpaint.log
   assert_uses_original "/usr/lib/$multiarch/tracker-miners-3.0/extract-modules/libextract-gif.so" /tmp/ldd-tracker-gif.log
+  assert_uses_original "/usr/lib/$multiarch/libextractor/libextractor_gif.so" /tmp/ldd-libextractor-gif.log
   assert_uses_original /usr/lib/ocaml/stublibs/dllcamlimages_gif_stubs.so /tmp/ldd-camlimages-gif.log
   assert_uses_original "$libgdal_path" /tmp/ldd-libgdal.log
 }
@@ -295,28 +297,23 @@ test_tracker_extract_runtime() {
 
 test_libextractor_runtime() {
   local multiarch
-  local plugin_dir
   local plugin_path
+  local dimensions_regex
 
   log_step "libextractor-plugin-gif"
 
+  dpkg-query -W -f='${Status}\n' libextractor-plugin-gif > /tmp/libextractor-package.log
+  require_contains /tmp/libextractor-package.log "install ok installed"
+
   multiarch="$(gcc -print-multiarch)"
-  plugin_dir="/usr/lib/$multiarch/libextractor"
-  plugin_path="$(find "$plugin_dir" -maxdepth 1 -type f -name '*gif*.so' 2>/dev/null | sort | head -n1 || true)"
+  plugin_path="/usr/lib/$multiarch/libextractor/libextractor_gif.so"
+  [[ -f "$plugin_path" ]] || die "unable to locate libextractor GIF plugin"
 
-  if [[ -n "$plugin_path" ]]; then
-    assert_uses_original "$plugin_path" /tmp/ldd-libextractor-gif.log
-    extract -n -l gif -V "$SAMPLE_GIF" > /tmp/libextractor-gif.log
-    require_contains /tmp/libextractor-gif.log "mimetype - image/gif"
-    require_contains /tmp/libextractor-gif.log "image dimensions - ${SAMPLE_WIDTH}x${SAMPLE_HEIGHT}"
-    return
-  fi
-
-  # Ubuntu 24.04 does not ship the GIF extractor module as a separate shared
-  # object, so the best available binary-level check is that the frontend is
-  # installed and can process a GIF input without failing.
-  extract -l gif -V "$SAMPLE_GIF" > /tmp/libextractor-gif.log
-  require_contains /tmp/libextractor-gif.log "Keywords for file $SAMPLE_GIF:"
+  assert_uses_original "$plugin_path" /tmp/ldd-libextractor-gif.log
+  extract -n -l gif -V "$SAMPLE_GIF" > /tmp/libextractor-gif.log
+  require_contains /tmp/libextractor-gif.log "mimetype - image/gif"
+  dimensions_regex="image dimensions - (${SAMPLE_WIDTH}x${SAMPLE_HEIGHT}|${SAMPLE_HEIGHT}x${SAMPLE_WIDTH})"
+  require_regex /tmp/libextractor-gif.log "$dimensions_regex"
 }
 
 test_camlimages_runtime() {
