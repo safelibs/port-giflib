@@ -59,7 +59,7 @@ pub unsafe fn openbsd_reallocarray_impl(
     unsafe { realloc(optr, size * nmemb) }
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn openbsd_reallocarray(
     optr: *mut c_void,
     nmemb: usize,

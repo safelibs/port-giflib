@@ -100,7 +100,7 @@ unsafe fn saved_extension_to_gcb_impl(
     GIF_ERROR
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifGCBToExtension(
     GCB: *const GraphicsControlBlock,
     GifExtension: *mut GifByteType,
@@ -108,7 +108,7 @@ pub unsafe extern "C" fn EGifGCBToExtension(
     catch_panic_or(0, || unsafe { gcb_to_extension_impl(GCB, GifExtension) })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifGCBToSavedExtension(
     GCB: *const GraphicsControlBlock,
     GifFile: *mut GifFileType,
@@ -156,7 +156,7 @@ pub unsafe extern "C" fn EGifGCBToSavedExtension(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifExtensionToGCB(
     GifExtensionLength: usize,
     GifExtension: *const GifByteType,
@@ -167,7 +167,7 @@ pub unsafe extern "C" fn DGifExtensionToGCB(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifSavedExtensionToGCB(
     GifFile: *mut GifFileType,
     ImageIndex: i32,

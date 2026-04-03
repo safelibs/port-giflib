@@ -2,7 +2,8 @@
 #![allow(dead_code)]
 #![allow(non_snake_case)]
 
-use core::mem::{offset_of, size_of};
+use core::mem::size_of;
+use core::ptr;
 
 pub type GifPixelType = u8;
 pub type GifRowType = *mut GifPixelType;
@@ -94,7 +95,7 @@ pub struct GifColorType {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone)]
 pub struct ColorMapObject {
     pub ColorCount: i32,
     pub BitsPerPixel: i32,
@@ -104,7 +105,7 @@ pub struct ColorMapObject {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone)]
 pub struct GifImageDesc {
     pub Left: GifWord,
     pub Top: GifWord,
@@ -116,7 +117,7 @@ pub struct GifImageDesc {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone)]
 pub struct ExtensionBlock {
     pub ByteCount: i32,
     pub Bytes: *mut GifByteType,
@@ -124,7 +125,7 @@ pub struct ExtensionBlock {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone)]
 pub struct SavedImage {
     pub ImageDesc: GifImageDesc,
     pub RasterBits: *mut GifByteType,
@@ -133,7 +134,6 @@ pub struct SavedImage {
 }
 
 #[repr(C)]
-#[derive(Default)]
 pub struct GifFileType {
     pub SWidth: GifWord,
     pub SHeight: GifWord,
@@ -153,6 +153,78 @@ pub struct GifFileType {
     pub _padding3: [u8; 4],
     pub UserData: *mut core::ffi::c_void,
     pub Private: *mut core::ffi::c_void,
+}
+
+impl Default for ColorMapObject {
+    fn default() -> Self {
+        Self {
+            ColorCount: 0,
+            BitsPerPixel: 0,
+            SortFlag: GifBool::default(),
+            _padding0: [0; 7],
+            Colors: ptr::null_mut(),
+        }
+    }
+}
+
+impl Default for GifImageDesc {
+    fn default() -> Self {
+        Self {
+            Left: 0,
+            Top: 0,
+            Width: 0,
+            Height: 0,
+            Interlace: GifBool::default(),
+            _padding0: [0; 7],
+            ColorMap: ptr::null_mut(),
+        }
+    }
+}
+
+impl Default for ExtensionBlock {
+    fn default() -> Self {
+        Self {
+            ByteCount: 0,
+            Bytes: ptr::null_mut(),
+            Function: 0,
+        }
+    }
+}
+
+impl Default for SavedImage {
+    fn default() -> Self {
+        Self {
+            ImageDesc: GifImageDesc::default(),
+            RasterBits: ptr::null_mut(),
+            ExtensionBlockCount: 0,
+            ExtensionBlocks: ptr::null_mut(),
+        }
+    }
+}
+
+impl Default for GifFileType {
+    fn default() -> Self {
+        Self {
+            SWidth: 0,
+            SHeight: 0,
+            SColorResolution: 0,
+            SBackGroundColor: 0,
+            AspectByte: 0,
+            _padding0: [0; 7],
+            SColorMap: ptr::null_mut(),
+            ImageCount: 0,
+            _padding1: [0; 4],
+            Image: GifImageDesc::default(),
+            SavedImages: ptr::null_mut(),
+            ExtensionBlockCount: 0,
+            _padding2: [0; 4],
+            ExtensionBlocks: ptr::null_mut(),
+            Error: 0,
+            _padding3: [0; 4],
+            UserData: ptr::null_mut(),
+            Private: ptr::null_mut(),
+        }
+    }
 }
 
 #[repr(C)]
@@ -177,51 +249,10 @@ pub type OutputFunc =
 const _: () = {
     assert!(size_of::<GifColorType>() == 3);
     assert!(size_of::<ColorMapObject>() == 24);
-    assert!(offset_of!(ColorMapObject, ColorCount) == 0);
-    assert!(offset_of!(ColorMapObject, BitsPerPixel) == 4);
-    assert!(offset_of!(ColorMapObject, SortFlag) == 8);
-    assert!(offset_of!(ColorMapObject, Colors) == 16);
-
     assert!(size_of::<GifImageDesc>() == 32);
-    assert!(offset_of!(GifImageDesc, Left) == 0);
-    assert!(offset_of!(GifImageDesc, Top) == 4);
-    assert!(offset_of!(GifImageDesc, Width) == 8);
-    assert!(offset_of!(GifImageDesc, Height) == 12);
-    assert!(offset_of!(GifImageDesc, Interlace) == 16);
-    assert!(offset_of!(GifImageDesc, ColorMap) == 24);
-
     assert!(size_of::<ExtensionBlock>() == 24);
-    assert!(offset_of!(ExtensionBlock, ByteCount) == 0);
-    assert!(offset_of!(ExtensionBlock, Bytes) == 8);
-    assert!(offset_of!(ExtensionBlock, Function) == 16);
-
     assert!(size_of::<SavedImage>() == 56);
-    assert!(offset_of!(SavedImage, ImageDesc) == 0);
-    assert!(offset_of!(SavedImage, RasterBits) == 32);
-    assert!(offset_of!(SavedImage, ExtensionBlockCount) == 40);
-    assert!(offset_of!(SavedImage, ExtensionBlocks) == 48);
-
     assert!(size_of::<GifFileType>() == 120);
-    assert!(offset_of!(GifFileType, SWidth) == 0);
-    assert!(offset_of!(GifFileType, SHeight) == 4);
-    assert!(offset_of!(GifFileType, SColorResolution) == 8);
-    assert!(offset_of!(GifFileType, SBackGroundColor) == 12);
-    assert!(offset_of!(GifFileType, AspectByte) == 16);
-    assert!(offset_of!(GifFileType, SColorMap) == 24);
-    assert!(offset_of!(GifFileType, ImageCount) == 32);
-    assert!(offset_of!(GifFileType, Image) == 40);
-    assert!(offset_of!(GifFileType, SavedImages) == 72);
-    assert!(offset_of!(GifFileType, ExtensionBlockCount) == 80);
-    assert!(offset_of!(GifFileType, ExtensionBlocks) == 88);
-    assert!(offset_of!(GifFileType, Error) == 96);
-    assert!(offset_of!(GifFileType, UserData) == 104);
-    assert!(offset_of!(GifFileType, Private) == 112);
-
     assert!(size_of::<GraphicsControlBlock>() == 16);
-    assert!(offset_of!(GraphicsControlBlock, DisposalMode) == 0);
-    assert!(offset_of!(GraphicsControlBlock, UserInputFlag) == 4);
-    assert!(offset_of!(GraphicsControlBlock, DelayTime) == 8);
-    assert!(offset_of!(GraphicsControlBlock, TransparentColor) == 12);
-
     assert!(size_of::<GifHashTableType>() == 32768);
 };

@@ -1,0 +1,4 @@
+giflib_5.2.2-1ubuntu1+safelibs1_amd64.buildinfo libs optional
+libgif-dev_5.2.2-1ubuntu1+safelibs1_amd64.deb libdevel optional
+libgif7-dbgsym_5.2.2-1ubuntu1+safelibs1_amd64.ddeb debug optional automatic=yes
+libgif7_5.2.2-1ubuntu1+safelibs1_amd64.deb libs optional

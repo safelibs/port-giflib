@@ -69,7 +69,7 @@ fn gif_error_string_impl(ErrorCode: i32) -> *const c_char {
     }
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn GifErrorString(ErrorCode: i32) -> *const c_char {
     catch_panic_or(ptr::null(), || gif_error_string_impl(ErrorCode))
 }

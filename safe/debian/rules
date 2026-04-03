@@ -1,0 +1,44 @@
+#!/usr/bin/make -f
+
+export DH_ALWAYS_EXCLUDE = CVS:.idea
+
+include /usr/share/dpkg/pkg-info.mk
+include /usr/share/dpkg/architecture.mk
+
+export DEB_BUILD_MAINT_OPTIONS := hardening=+all
+export DPKG_GENSYMBOLS_CHECK_LEVEL := 4
+export CARGO_TARGET_DIR := $(CURDIR)/debian/cargo-target
+export RUSTFLAGS := $(strip $(RUSTFLAGS) $(foreach flag,$(LDFLAGS),-C link-arg=$(flag)))
+
+LIBMAJOR := 7
+LIBMINOR := 2
+LIBPOINT := 0
+LIBVER := $(LIBMAJOR).$(LIBMINOR).$(LIBPOINT)
+TARGET_LIBDIR := debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)
+TARGET_PKGCONFIG_DIR := $(TARGET_LIBDIR)/pkgconfig
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	cargo build --release --locked
+
+override_dh_auto_install:
+	rm -rf debian/tmp
+	install -d $(TARGET_LIBDIR)
+	install -d $(TARGET_PKGCONFIG_DIR)
+	install -d debian/tmp/usr/include
+	install -m 755 $(CARGO_TARGET_DIR)/release/libgif.so $(TARGET_LIBDIR)/libgif.so.$(LIBVER)
+	ln -sf libgif.so.$(LIBVER) $(TARGET_LIBDIR)/libgif.so.$(LIBMAJOR)
+	ln -sf libgif.so.$(LIBMAJOR) $(TARGET_LIBDIR)/libgif.so
+	install -m 644 $(CARGO_TARGET_DIR)/release/libgif.a $(TARGET_LIBDIR)/libgif.a
+	install -m 644 include/gif_lib.h debian/tmp/usr/include/gif_lib.h
+	sed -e "s/@DEB_TARGET_MULTIARCH@/$(DEB_HOST_MULTIARCH)/" \
+		-e "s/@VERSION@/$(DEB_VERSION_UPSTREAM)/" \
+		debian/pkgconfig/libgif7.pc.in \
+		> $(TARGET_PKGCONFIG_DIR)/libgif7.pc
+	ln -sf libgif7.pc $(TARGET_PKGCONFIG_DIR)/libgif.pc
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf debian/cargo-target debian/tmp

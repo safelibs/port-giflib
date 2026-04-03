@@ -597,7 +597,7 @@ pub(crate) unsafe fn get_screen_desc_impl(GifFile: *mut GifFileType) -> i32 {
     GIF_OK
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifGetGifVersion(GifFile: *mut GifFileType) -> *const c_char {
     catch_panic_or(GIF87_STAMP.as_ptr().cast(), || unsafe {
         let state = require_decoder(GifFile);
@@ -645,7 +645,7 @@ pub(crate) unsafe fn get_record_type_impl(
     }
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifGetRecordType(
     GifFile: *mut GifFileType,
     Type: *mut GifRecordType,
@@ -737,7 +737,7 @@ pub(crate) unsafe fn get_image_header_impl(GifFile: *mut GifFileType) -> i32 {
     unsafe { setup_decompress_impl(GifFile) }
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifGetImageHeader(GifFile: *mut GifFileType) -> i32 {
     catch_panic_or(GIF_ERROR, || unsafe { get_image_header_impl(GifFile) })
 }
@@ -817,7 +817,7 @@ pub(crate) unsafe fn get_image_desc_impl(GifFile: *mut GifFileType) -> i32 {
     GIF_OK
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifGetImageDesc(GifFile: *mut GifFileType) -> i32 {
     catch_panic_or(GIF_ERROR, || unsafe { get_image_desc_impl(GifFile) })
 }
@@ -863,7 +863,7 @@ pub(crate) unsafe fn get_code_next_impl(
     GIF_OK
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifGetCodeNext(
     GifFile: *mut GifFileType,
     CodeBlock: *mut *mut GifByteType,
@@ -932,7 +932,7 @@ pub(crate) unsafe fn get_line_impl(
     }
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifGetLine(
     GifFile: *mut GifFileType,
     Line: *mut GifPixelType,
@@ -978,7 +978,7 @@ unsafe fn get_pixel_impl(GifFile: *mut GifFileType, Pixel: GifPixelType) -> i32 
     }
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifGetPixel(GifFile: *mut GifFileType, Pixel: GifPixelType) -> i32 {
     catch_panic_or(GIF_ERROR, || unsafe { get_pixel_impl(GifFile, Pixel) })
 }
@@ -1008,7 +1008,7 @@ pub(crate) unsafe fn get_extension_impl(
     unsafe { get_extension_next_impl(GifFile, Extension) }
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifGetExtension(
     GifFile: *mut GifFileType,
     ExtCode: *mut i32,
@@ -1058,7 +1058,7 @@ pub(crate) unsafe fn get_extension_next_impl(
     GIF_OK
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifGetExtensionNext(
     GifFile: *mut GifFileType,
     Extension: *mut *mut GifByteType,
@@ -1084,7 +1084,7 @@ unsafe fn get_code_impl(
     unsafe { get_code_next_impl(GifFile, CodeBlock) }
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifGetCode(
     GifFile: *mut GifFileType,
     CodeSize: *mut i32,
@@ -1129,7 +1129,7 @@ unsafe fn get_lz_codes_impl(GifFile: *mut GifFileType, Code: *mut i32) -> i32 {
     GIF_OK
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifGetLZCodes(GifFile: *mut GifFileType, Code: *mut i32) -> i32 {
     catch_panic_or(GIF_ERROR, || unsafe { get_lz_codes_impl(GifFile, Code) })
 }
@@ -1187,7 +1187,7 @@ unsafe fn close_file_impl(GifFile: *mut GifFileType, ErrorCode: *mut i32) -> i32
     GIF_OK
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifOpenFileName(
     FileName: *const c_char,
     Error: *mut i32,
@@ -1205,7 +1205,7 @@ pub unsafe extern "C" fn DGifOpenFileName(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifOpenFileHandle(FileHandle: i32, Error: *mut i32) -> *mut GifFileType {
     catch_panic_or(ptr::null_mut(), || unsafe {
         let gif_file = open_common_impl(Error);
@@ -1240,7 +1240,7 @@ pub unsafe extern "C" fn DGifOpenFileHandle(FileHandle: i32, Error: *mut i32) ->
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifOpen(
     userData: *mut c_void,
     readFunc: crate::ffi::InputFunc,
@@ -1269,12 +1269,12 @@ pub unsafe extern "C" fn DGifOpen(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifGetScreenDesc(GifFile: *mut GifFileType) -> i32 {
     catch_panic_or(GIF_ERROR, || unsafe { get_screen_desc_impl(GifFile) })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifCloseFile(GifFile: *mut GifFileType, ErrorCode: *mut i32) -> i32 {
     catch_panic_or(GIF_ERROR, || unsafe { close_file_impl(GifFile, ErrorCode) })
 }

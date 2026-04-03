@@ -219,14 +219,14 @@ unsafe fn slurp_impl(GifFile: *mut GifFileType) -> i32 {
     GIF_OK
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifDecreaseImageCounter(GifFile: *mut GifFileType) {
     catch_panic_or((), || unsafe {
         decrease_image_counter_impl(GifFile);
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn DGifSlurp(GifFile: *mut GifFileType) -> i32 {
     catch_panic_or(GIF_ERROR, || unsafe { slurp_impl(GifFile) })
 }

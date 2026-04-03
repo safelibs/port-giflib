@@ -7,7 +7,7 @@ use std::ffi::CStr;
 use crate::bootstrap::catch_panic_or;
 use crate::ffi::{GifPixelType, SavedImage, GIF_FONT_HEIGHT, GIF_FONT_WIDTH};
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub static GifAsciiTable8x8: [[u8; GIF_FONT_WIDTH]; 128] = [
     [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00], /* Ascii 0 */
     [0x3c, 0x42, 0xa5, 0x81, 0xbd, 0x42, 0x3c, 0x00], /* Ascii 1 */
@@ -272,7 +272,7 @@ unsafe fn draw_rectangle_impl(Image: *mut SavedImage, x: i32, y: i32, w: i32, d:
     }
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn GifDrawText8x8(
     Image: *mut SavedImage,
     x: i32,
@@ -289,7 +289,7 @@ pub unsafe extern "C" fn GifDrawText8x8(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn GifDrawBox(
     Image: *mut SavedImage,
     x: i32,
@@ -303,7 +303,7 @@ pub unsafe extern "C" fn GifDrawBox(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn GifDrawRectangle(
     Image: *mut SavedImage,
     x: i32,
@@ -317,7 +317,7 @@ pub unsafe extern "C" fn GifDrawRectangle(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn GifDrawBoxedText8x8(
     Image: *mut SavedImage,
     x: i32,

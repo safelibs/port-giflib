@@ -1,0 +1,5 @@
+giflib (5.2.2-1ubuntu1+safelibs1) noble; urgency=medium
+
+  * Build the Rust port as local libgif7 and libgif-dev replacement packages.
+
+ -- SafeLibs Maintainers <safelibs@example.invalid>  Fri, 03 Apr 2026 09:00:00 -0700

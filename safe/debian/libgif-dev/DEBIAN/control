@@ -1,0 +1,17 @@
+Package: libgif-dev
+Source: giflib
+Version: 5.2.2-1ubuntu1+safelibs1
+Architecture: amd64
+Maintainer: SafeLibs Maintainers <safelibs@example.invalid>
+Installed-Size: 3007
+Depends: libgif7 (= 5.2.2-1ubuntu1+safelibs1)
+Section: libdevel
+Priority: optional
+Multi-Arch: same
+Homepage: https://giflib.sourceforge.net/
+Description: library for GIF images (development)
+ GIFLIB is a package of portable tools and library routines for working with
+ GIF images.
+ .
+ This package contains the development files.
+Original-Maintainer: David Suárez <deiv@debian.org>

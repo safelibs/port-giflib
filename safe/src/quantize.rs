@@ -163,7 +163,7 @@ fn subdiv_color_map(
     GIF_OK
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn GifQuantizeBuffer(
     Width: u32,
     Height: u32,

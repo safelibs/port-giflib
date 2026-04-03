@@ -1028,7 +1028,7 @@ unsafe fn spew_impl(GifFileOut: *mut GifFileType) -> i32 {
     unsafe { close_file_impl(GifFileOut, ptr::null_mut()) }
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifOpenFileName(
     FileName: *const c_char,
     TestExistence: bool,
@@ -1051,7 +1051,7 @@ pub unsafe extern "C" fn EGifOpenFileName(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifOpenFileHandle(FileHandle: i32, Error: *mut i32) -> *mut GifFileType {
     catch_panic_or(ptr::null_mut(), || unsafe {
         let gif_file = open_common_impl(Error, false);
@@ -1077,7 +1077,7 @@ pub unsafe extern "C" fn EGifOpenFileHandle(FileHandle: i32, Error: *mut i32) ->
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifOpen(
     userData: *mut c_void,
     writeFunc: OutputFunc,
@@ -1107,7 +1107,7 @@ pub unsafe extern "C" fn EGifOpen(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifGetGifVersion(GifFile: *mut GifFileType) -> *const c_char {
     catch_panic_or(GIF87_STAMP.as_ptr().cast(), || unsafe {
         if gif_version_bytes(GifFile) == GIF89_WRITE_STAMP {
@@ -1118,7 +1118,7 @@ pub unsafe extern "C" fn EGifGetGifVersion(GifFile: *mut GifFileType) -> *const 
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifSetGifVersion(GifFile: *mut GifFileType, gif89: bool) {
     catch_panic_or((), || unsafe {
         let state = require_encoder(GifFile);
@@ -1128,7 +1128,7 @@ pub unsafe extern "C" fn EGifSetGifVersion(GifFile: *mut GifFileType, gif89: boo
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifPutScreenDesc(
     GifFile: *mut GifFileType,
     Width: i32,
@@ -1142,7 +1142,7 @@ pub unsafe extern "C" fn EGifPutScreenDesc(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifPutImageDesc(
     GifFile: *mut GifFileType,
     Left: i32,
@@ -1157,7 +1157,7 @@ pub unsafe extern "C" fn EGifPutImageDesc(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifPutLine(
     GifFile: *mut GifFileType,
     Line: *mut GifPixelType,
@@ -1168,24 +1168,24 @@ pub unsafe extern "C" fn EGifPutLine(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifPutPixel(GifFile: *mut GifFileType, Pixel: GifPixelType) -> i32 {
     catch_panic_or(GIF_ERROR, || unsafe { put_pixel_impl(GifFile, Pixel) })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifPutComment(GifFile: *mut GifFileType, Comment: *const c_char) -> i32 {
     catch_panic_or(GIF_ERROR, || unsafe { put_comment_impl(GifFile, Comment) })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifPutExtensionLeader(GifFile: *mut GifFileType, ExtCode: i32) -> i32 {
     catch_panic_or(GIF_ERROR, || unsafe {
         put_extension_leader_impl(GifFile, ExtCode)
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifPutExtensionBlock(
     GifFile: *mut GifFileType,
     ExtLen: i32,
@@ -1196,12 +1196,12 @@ pub unsafe extern "C" fn EGifPutExtensionBlock(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifPutExtensionTrailer(GifFile: *mut GifFileType) -> i32 {
     catch_panic_or(GIF_ERROR, || unsafe { put_extension_trailer_impl(GifFile) })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifPutExtension(
     GifFile: *mut GifFileType,
     ExtCode: i32,
@@ -1213,7 +1213,7 @@ pub unsafe extern "C" fn EGifPutExtension(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifPutCode(
     GifFile: *mut GifFileType,
     _CodeSize: i32,
@@ -1224,19 +1224,19 @@ pub unsafe extern "C" fn EGifPutCode(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifPutCodeNext(GifFile: *mut GifFileType, CodeBlock: *const u8) -> i32 {
     catch_panic_or(GIF_ERROR, || unsafe {
         put_code_next_impl(GifFile, CodeBlock)
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifCloseFile(GifFile: *mut GifFileType, ErrorCode: *mut i32) -> i32 {
     catch_panic_or(GIF_ERROR, || unsafe { close_file_impl(GifFile, ErrorCode) })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn EGifSpew(GifFileOut: *mut GifFileType) -> i32 {
     catch_panic_or(GIF_ERROR, || unsafe { spew_impl(GifFileOut) })
 }

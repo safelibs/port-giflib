@@ -1,0 +1,5 @@
+debian/tmp/usr/include/gif_lib.h
+debian/tmp/usr/lib/x86_64-linux-gnu/libgif.a
+debian/tmp/usr/lib/x86_64-linux-gnu/libgif.so
+debian/tmp/usr/lib/x86_64-linux-gnu/pkgconfig/libgif.pc
+debian/tmp/usr/lib/x86_64-linux-gnu/pkgconfig/libgif7.pc

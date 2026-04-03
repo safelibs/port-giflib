@@ -177,12 +177,12 @@ unsafe fn make_saved_image_impl(
     }
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn GifBitSize(n: i32) -> i32 {
     catch_panic_or(0, || gif_bit_size_impl(n))
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn GifMakeMapObject(
     ColorCount: i32,
     ColorMap: *const GifColorType,
@@ -223,7 +223,7 @@ pub unsafe extern "C" fn GifMakeMapObject(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn GifFreeMapObject(Object: *mut ColorMapObject) {
     catch_panic_or((), || unsafe {
         if Object.is_null() {
@@ -234,7 +234,7 @@ pub unsafe extern "C" fn GifFreeMapObject(Object: *mut ColorMapObject) {
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn GifUnionColorMap(
     ColorIn1: *const ColorMapObject,
     ColorIn2: *const ColorMapObject,
@@ -336,7 +336,7 @@ pub unsafe extern "C" fn GifUnionColorMap(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn GifApplyTranslation(
     Image: *mut SavedImage,
     Translation: *const GifPixelType,
@@ -356,7 +356,7 @@ pub unsafe extern "C" fn GifApplyTranslation(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn GifAddExtensionBlock(
     ExtensionBlockCount: *mut i32,
     ExtensionBlocks: *mut *mut ExtensionBlock,
@@ -413,7 +413,7 @@ pub unsafe extern "C" fn GifAddExtensionBlock(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn GifFreeExtensions(
     ExtensionBlockCount: *mut i32,
     ExtensionBlocks: *mut *mut ExtensionBlock,
@@ -435,7 +435,7 @@ pub unsafe extern "C" fn GifFreeExtensions(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn FreeLastSavedImage(GifFile: *mut GifFileType) {
     catch_panic_or((), || unsafe {
         if GifFile.is_null() || (*GifFile).SavedImages.is_null() || (*GifFile).ImageCount <= 0 {
@@ -449,7 +449,7 @@ pub unsafe extern "C" fn FreeLastSavedImage(GifFile: *mut GifFileType) {
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn GifMakeSavedImage(
     GifFile: *mut GifFileType,
     CopyFrom: *const SavedImage,
@@ -459,7 +459,7 @@ pub unsafe extern "C" fn GifMakeSavedImage(
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn GifFreeSavedImages(GifFile: *mut GifFileType) {
     catch_panic_or((), || unsafe {
         if GifFile.is_null() || (*GifFile).SavedImages.is_null() {

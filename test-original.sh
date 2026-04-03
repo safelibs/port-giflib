@@ -14,6 +14,11 @@ if [[ ! -d "$ROOT/original" ]]; then
   exit 1
 fi
 
+if [[ ! -d "$ROOT/safe" ]]; then
+  echo "missing safe source tree" >&2
+  exit 1
+fi
+
 if [[ ! -f "$ROOT/dependents.json" ]]; then
   echo "missing dependents.json" >&2
   exit 1
@@ -31,8 +36,10 @@ RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.s
       automake \
       build-essential \
       ca-certificates \
+      cargo \
       cmake \
       dbus-x11 \
+      debhelper \
       dpkg-dev \
       extract \
       fbi \
@@ -49,6 +56,7 @@ RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.s
       ocaml-nox \
       pkg-config \
       python3 \
+      rustc \
       strace \
       tracker-extract \
       webp \
@@ -64,6 +72,7 @@ RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.s
  && rm -rf /var/lib/apt/lists/*
 
 COPY dependents.json /work/dependents.json
+COPY safe /work/safe
 COPY original /work/original
 WORKDIR /work
 DOCKERFILE
@@ -76,9 +85,9 @@ export LC_ALL=C.UTF-8
 export DEBIAN_FRONTEND=noninteractive
 
 ROOT=/work
-SRC_ROOT=/tmp/giflib-original
+SAFE_ROOT=/work/safe
+ORIGINAL_ROOT=/work/original
 DOWNSTREAM_ROOT=/tmp/giflib-dependent-sources
-export LD_LIBRARY_PATH="/usr/local/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 log_step() {
   printf '\n==> %s\n' "$1"
@@ -131,12 +140,167 @@ require_regex() {
   fi
 }
 
-assert_uses_original() {
-  local path="$1"
-  local log="$2"
+build_safe_packages() {
+  local runtime_matches
+  local dev_matches
 
+  log_step "Building safe Debian packages"
+
+  rm -f "$ROOT"/libgif7_*.deb "$ROOT"/libgif-dev_*.deb "$ROOT"/libgif7-dbgsym_*.deb
+  if ! (
+    cd "$SAFE_ROOT"
+    dpkg-buildpackage -us -uc -b >/tmp/safe-dpkg-build.log 2>&1
+  ); then
+    cat /tmp/safe-dpkg-build.log >&2
+    exit 1
+  fi
+
+  runtime_matches="$(find "$ROOT" -maxdepth 1 -type f -name 'libgif7_*.deb' | LC_ALL=C sort)"
+  dev_matches="$(find "$ROOT" -maxdepth 1 -type f -name 'libgif-dev_*.deb' | LC_ALL=C sort)"
+
+  [[ "$(printf '%s\n' "$runtime_matches" | sed '/^$/d' | wc -l)" -eq 1 ]] || die "expected exactly one libgif7 Debian package"
+  [[ "$(printf '%s\n' "$dev_matches" | sed '/^$/d' | wc -l)" -eq 1 ]] || die "expected exactly one libgif-dev Debian package"
+
+  SAFE_RUNTIME_DEB="$(printf '%s\n' "$runtime_matches" | head -n1)"
+  SAFE_DEV_DEB="$(printf '%s\n' "$dev_matches" | head -n1)"
+  SAFE_RUNTIME_PACKAGE="$(dpkg-deb -f "$SAFE_RUNTIME_DEB" Package)"
+  SAFE_RUNTIME_VERSION="$(dpkg-deb -f "$SAFE_RUNTIME_DEB" Version)"
+  SAFE_DEV_PACKAGE="$(dpkg-deb -f "$SAFE_DEV_DEB" Package)"
+  SAFE_DEV_VERSION="$(dpkg-deb -f "$SAFE_DEV_DEB" Version)"
+
+  [[ "$SAFE_RUNTIME_PACKAGE" == "libgif7" ]] || die "unexpected runtime package name: $SAFE_RUNTIME_PACKAGE"
+  [[ "$SAFE_DEV_PACKAGE" == "libgif-dev" ]] || die "unexpected development package name: $SAFE_DEV_PACKAGE"
+
+  export SAFE_RUNTIME_DEB SAFE_DEV_DEB
+  export SAFE_RUNTIME_PACKAGE SAFE_RUNTIME_VERSION
+  export SAFE_DEV_PACKAGE SAFE_DEV_VERSION
+
+  printf 'SAFE_RUNTIME_DEB=%s\n' "$SAFE_RUNTIME_DEB"
+  printf 'SAFE_DEV_DEB=%s\n' "$SAFE_DEV_DEB"
+  printf 'SAFE_RUNTIME_PACKAGE=%s\n' "$SAFE_RUNTIME_PACKAGE"
+  printf 'SAFE_DEV_PACKAGE=%s\n' "$SAFE_DEV_PACKAGE"
+  printf 'SAFE_RUNTIME_VERSION=%s\n' "$SAFE_RUNTIME_VERSION"
+  printf 'SAFE_DEV_VERSION=%s\n' "$SAFE_DEV_VERSION"
+}
+
+install_safe_packages() {
+  log_step "Installing safe Debian packages"
+
+  dpkg -i "$SAFE_RUNTIME_DEB" "$SAFE_DEV_DEB" >/tmp/safe-dpkg-install.log 2>&1 || {
+    cat /tmp/safe-dpkg-install.log >&2
+    exit 1
+  }
+  ldconfig
+
+  ACTIVE_RUNTIME_VERSION="$(dpkg-query -W -f='${Version}\n' libgif7)"
+  ACTIVE_DEV_VERSION="$(dpkg-query -W -f='${Version}\n' libgif-dev)"
+
+  [[ "$ACTIVE_RUNTIME_VERSION" == "$SAFE_RUNTIME_VERSION" ]] || die "active libgif7 version mismatch"
+  [[ "$ACTIVE_DEV_VERSION" == "$SAFE_DEV_VERSION" ]] || die "active libgif-dev version mismatch"
+
+  export ACTIVE_RUNTIME_VERSION ACTIVE_DEV_VERSION
+
+  printf 'ACTIVE_RUNTIME_VERSION=%s\n' "$ACTIVE_RUNTIME_VERSION"
+  printf 'ACTIVE_DEV_VERSION=%s\n' "$ACTIVE_DEV_VERSION"
+}
+
+resolve_installed_shared_libgif() {
+  local label="$1"
+  local cache_path
+  local real_cache_path
+  local package_paths
+  local owner
+  local matched=0
+
+  cache_path="$(ldconfig -p | awk '/libgif\.so\.7 \(/{ print $NF; exit }')"
+  [[ -n "$cache_path" ]] || die "unable to locate active shared libgif via ldconfig"
+  real_cache_path="$(readlink -f "$cache_path")"
+
+  package_paths="$(dpkg-query -L libgif7 | grep -E '/libgif\.so\.7(\.[0-9]+)*$' || true)"
+  while IFS= read -r package_path; do
+    [[ -n "$package_path" ]] || continue
+    if [[ "$package_path" == "$cache_path" || "$package_path" == "$real_cache_path" || "$(readlink -f "$package_path")" == "$real_cache_path" ]]; then
+      matched=1
+      break
+    fi
+  done <<< "$package_paths"
+  [[ "$matched" -eq 1 ]] || {
+    printf 'active shared libgif path %s is not owned by libgif7 package contents\n' "$cache_path" >&2
+    printf '%s\n' "$package_paths" >&2
+    exit 1
+  }
+
+  owner="$(dpkg-query -S "$cache_path" 2>/dev/null | sed 's/: .*//' | head -n1 || true)"
+  if [[ -z "$owner" ]]; then
+    owner="$(dpkg-query -S "$real_cache_path" 2>/dev/null | sed 's/: .*//' | head -n1 || true)"
+  fi
+  [[ -n "$owner" ]] || die "unable to determine owner for $cache_path"
+
+  ACTIVE_SHARED_LIBGIF="$cache_path"
+  ACTIVE_SHARED_OWNER="$owner"
+  export ACTIVE_SHARED_LIBGIF ACTIVE_SHARED_OWNER
+
+  printf 'ACTIVE_SHARED_LIBGIF[%s]=%s\n' "$label" "$ACTIVE_SHARED_LIBGIF"
+  printf 'ACTIVE_SHARED_OWNER[%s]=%s\n' "$label" "$ACTIVE_SHARED_OWNER"
+}
+
+resolve_installed_static_libgif() {
+  local label="$1"
+  local archive_path
+  local owner
+
+  archive_path="$(dpkg-query -L libgif-dev | grep -E '/libgif\.a$' | head -n1)"
+  [[ -n "$archive_path" ]] || die "unable to locate packaged static libgif archive"
+
+  owner="$(dpkg-query -S "$archive_path" 2>/dev/null | sed 's/: .*//' | head -n1 || true)"
+  [[ -n "$owner" ]] || die "unable to determine owner for $archive_path"
+
+  ACTIVE_STATIC_LIBGIF="$archive_path"
+  ACTIVE_STATIC_OWNER="$owner"
+  export ACTIVE_STATIC_LIBGIF ACTIVE_STATIC_OWNER
+
+  printf 'ACTIVE_STATIC_LIBGIF[%s]=%s\n' "$label" "$ACTIVE_STATIC_LIBGIF"
+  printf 'ACTIVE_STATIC_OWNER[%s]=%s\n' "$label" "$ACTIVE_STATIC_OWNER"
+}
+
+assert_links_to_active_shared_libgif() {
+  local label="$1"
+  local path="$2"
+  local log="$3"
+
+  resolve_installed_shared_libgif "$label"
   ldd "$path" > "$log"
-  require_contains "$log" "/usr/local/lib/libgif.so.7"
+  require_contains "$log" "$ACTIVE_SHARED_LIBGIF"
+}
+
+assert_build_uses_active_giflib() {
+  local label="$1"
+  local path="$2"
+  local log="$3"
+  local link_cmd="$4"
+  local mode
+
+  require_nonempty_file "$link_cmd"
+  resolve_installed_shared_libgif "$label"
+  resolve_installed_static_libgif "$label"
+
+  if ldd "$path" > "$log" 2>&1 && grep -F -- "$ACTIVE_SHARED_LIBGIF" "$log" >/dev/null 2>&1; then
+    mode=shared
+  else
+    require_contains "$link_cmd" "$ACTIVE_STATIC_LIBGIF"
+    mode=static
+  fi
+
+  printf 'LINK_ASSERT_MODE[%s]=%s\n' "$label" "$mode"
+}
+
+capture_last_matching_line() {
+  local input="$1"
+  local pattern="$2"
+  local output="$3"
+
+  grep -F -- "$pattern" "$input" | tail -n1 > "$output" || true
+  require_nonempty_file "$output"
 }
 
 find_artifact_using_libgif() {
@@ -185,19 +349,6 @@ validate_dependents_inventory() {
     diff -u <(printf '%s\n' "$expected") <(printf '%s\n' "$actual") >&2 || true
     exit 1
   fi
-}
-
-build_original_giflib() {
-  log_step "Building original giflib"
-
-  rm -rf "$SRC_ROOT"
-  cp -a "$ROOT/original" "$SRC_ROOT"
-  make -C "$SRC_ROOT" clean >/tmp/giflib-clean.log 2>&1 || true
-  make -C "$SRC_ROOT" -j"$(nproc)" libgif.so libgif.a >/tmp/giflib-build.log 2>&1
-  make -C "$SRC_ROOT" install-lib install-include >/tmp/giflib-install.log 2>&1
-
-  printf '/usr/local/lib\n' > /etc/ld.so.conf.d/zz-giflib-local.conf
-  ldconfig
 }
 
 discover_sample_dimensions() {
@@ -392,20 +543,20 @@ assert_runtime_linkage() {
   local multiarch
   local libgdal_path
 
-  log_step "Verifying runtime linkage to original giflib"
+  log_step "Verifying runtime linkage to active packaged giflib"
 
   multiarch="$(gcc -print-multiarch)"
   libgdal_path="$(ldconfig -p | awk '/libgdal\.so/ { print $NF; exit }')"
   [[ -n "$libgdal_path" ]] || die "unable to locate libgdal shared library"
 
-  assert_uses_original /usr/bin/giftext /tmp/ldd-giftext.log
-  assert_uses_original /usr/bin/gif2webp /tmp/ldd-gif2webp.log
-  assert_uses_original /usr/bin/fbi /tmp/ldd-fbi.log
-  assert_uses_original /usr/bin/mtpaint /tmp/ldd-mtpaint.log
-  assert_uses_original "/usr/lib/$multiarch/tracker-miners-3.0/extract-modules/libextract-gif.so" /tmp/ldd-tracker-gif.log
-  assert_uses_original "/usr/lib/$multiarch/libextractor/libextractor_gif.so" /tmp/ldd-libextractor-gif.log
-  assert_uses_original /usr/lib/ocaml/stublibs/dllcamlimages_gif_stubs.so /tmp/ldd-camlimages-gif.log
-  assert_uses_original "$libgdal_path" /tmp/ldd-libgdal.log
+  assert_links_to_active_shared_libgif "giflib-tools-runtime" /usr/bin/giftext /tmp/ldd-giftext.log
+  assert_links_to_active_shared_libgif "webp-runtime" /usr/bin/gif2webp /tmp/ldd-gif2webp.log
+  assert_links_to_active_shared_libgif "fbi-runtime" /usr/bin/fbi /tmp/ldd-fbi.log
+  assert_links_to_active_shared_libgif "mtpaint-runtime" /usr/bin/mtpaint /tmp/ldd-mtpaint.log
+  assert_links_to_active_shared_libgif "tracker-extract-runtime" "/usr/lib/$multiarch/tracker-miners-3.0/extract-modules/libextract-gif.so" /tmp/ldd-tracker-gif.log
+  assert_links_to_active_shared_libgif "libextractor-runtime" "/usr/lib/$multiarch/libextractor/libextractor_gif.so" /tmp/ldd-libextractor-gif.log
+  assert_links_to_active_shared_libgif "camlimages-runtime" /usr/lib/ocaml/stublibs/dllcamlimages_gif_stubs.so /tmp/ldd-camlimages-gif.log
+  assert_links_to_active_shared_libgif "gdal-runtime" "$libgdal_path" /tmp/ldd-libgdal.log
 }
 
 test_giflib_tools() {
@@ -489,7 +640,6 @@ test_libextractor_runtime() {
   plugin_path="/usr/lib/$multiarch/libextractor/libextractor_gif.so"
   [[ -f "$plugin_path" ]] || die "unable to locate libextractor GIF plugin"
 
-  assert_uses_original "$plugin_path" /tmp/ldd-libextractor-gif.log
   extract -n -l gif -V "$SAMPLE_GIF" > /tmp/libextractor-gif.log
   require_contains /tmp/libextractor-gif.log "mimetype - image/gif"
   dimensions_regex="image dimensions - (${SAMPLE_WIDTH}x${SAMPLE_HEIGHT}|${SAMPLE_HEIGHT}x${SAMPLE_WIDTH})"
@@ -520,6 +670,7 @@ test_gdal_runtime() {
 
 test_gdal_source() {
   local src build libgdal_path
+  local link_cmd
 
   log_step "gdal (source)"
 
@@ -540,7 +691,9 @@ test_gdal_source() {
 
   libgdal_path="$(find "$build" -type f -name 'libgdal.so*' | sort | head -n1)"
   [[ -n "$libgdal_path" ]] || die "unable to locate built GDAL shared library"
-  assert_uses_original "$libgdal_path" /tmp/gdal-build-ldd.log
+  link_cmd="$(find "$build" -path '*link.txt' -exec grep -l -- 'libgdal.so' {} + | LC_ALL=C sort | head -n1)"
+  [[ -n "$link_cmd" ]] || die "unable to locate GDAL linker command"
+  assert_build_uses_active_giflib "gdal-source" "$libgdal_path" /tmp/gdal-build-ldd.log "$link_cmd"
 
   GDAL_DATA="$src/data" \
   LD_LIBRARY_PATH="$(dirname "$libgdal_path")${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
@@ -552,6 +705,7 @@ test_gdal_source() {
 
 test_exactimage_source() {
   local src out
+  local link_cmd=/tmp/exactimage-link.txt
 
   log_step "exactimage (source)"
 
@@ -571,10 +725,11 @@ test_exactimage_source() {
       --with-php=no \
       --with-evas=no \
       >/tmp/exactimage-configure.log 2>&1
-    make -j"$(nproc)" >/tmp/exactimage-build.log 2>&1
+    make -j"$(nproc)" V=1 >/tmp/exactimage-build.log 2>&1
   )
 
-  assert_uses_original "$src/objdir/frontends/econvert" /tmp/exactimage-ldd.log
+  capture_last_matching_line /tmp/exactimage-build.log "objdir/frontends/econvert" "$link_cmd"
+  assert_build_uses_active_giflib "exactimage-source" "$src/objdir/frontends/econvert" /tmp/exactimage-ldd.log "$link_cmd"
 
   out=/tmp/exactimage-output.png
   "$src/objdir/frontends/econvert" -i "$SAMPLE_GIF" -o "$out" >/tmp/exactimage-runtime.log 2>&1
@@ -583,7 +738,8 @@ test_exactimage_source() {
 }
 
 test_sail_source() {
-  local src build prefix pkgconfig_dir gif_artifact
+  local src build prefix pkgconfig_dir gif_artifact link_dir
+  local link_cmd
 
   log_step "sail (source)"
 
@@ -604,8 +760,31 @@ test_sail_source() {
   cmake --build "$build" -j"$(nproc)" >/tmp/sail-build.log 2>&1
   cmake --install "$build" >/tmp/sail-install.log 2>&1
 
-  gif_artifact="$(find_artifact_using_libgif "$prefix")" || die "no GIF-linked SAIL artifact found"
-  assert_uses_original "$gif_artifact" /tmp/sail-ldd.log
+  link_cmd="$(find "$build" -path '*link.txt' -exec grep -l -- 'libgif' {} + | LC_ALL=C sort | head -n1)"
+  [[ -n "$link_cmd" ]] || die "unable to locate SAIL linker command"
+  gif_artifact="$(
+    awk '
+      {
+        for (i = 1; i < NF; i++) {
+          if ($i == "-o") {
+            print $(i + 1)
+            exit
+          }
+        }
+      }
+    ' "$link_cmd"
+  )"
+  [[ -n "$gif_artifact" ]] || die "unable to determine SAIL build artifact from $link_cmd"
+  if [[ ! -e "$gif_artifact" ]]; then
+    link_dir="$(dirname "$link_cmd")"
+    if [[ -e "$link_dir/$gif_artifact" ]]; then
+      gif_artifact="$link_dir/$gif_artifact"
+    fi
+  fi
+  if [[ ! -e "$gif_artifact" ]]; then
+    gif_artifact="$(find_artifact_using_libgif "$prefix")" || die "no GIF-linked SAIL artifact found"
+  fi
+  assert_build_uses_active_giflib "sail-source" "$gif_artifact" /tmp/sail-ldd.log "$link_cmd"
 
   pkgconfig_dir="$(dirname "$(find "$prefix" -type f -name sail.pc | head -n1)")"
   [[ -n "$pkgconfig_dir" ]] || die "unable to locate sail.pc"
@@ -663,10 +842,7 @@ test_libwebp_source() {
   cmake --build "$build" --target gif2webp -j"$(nproc)" >/tmp/libwebp-build.log 2>&1
 
   link_cmd="$build/CMakeFiles/gif2webp.dir/link.txt"
-  ldd "$build/gif2webp" > /tmp/libwebp-ldd.log
-  if ! grep -F -- '/usr/local/lib/libgif.so.7' /tmp/libwebp-ldd.log >/dev/null 2>&1; then
-    require_contains "$link_cmd" "/usr/local/lib/libgif.a"
-  fi
+  assert_build_uses_active_giflib "libwebp-source" "$build/gif2webp" /tmp/libwebp-ldd.log "$link_cmd"
 
   "$build/gif2webp" "$SAMPLE_GIF" -o /tmp/libwebp-source.webp >/tmp/libwebp-runtime.log 2>&1
   require_nonempty_file /tmp/libwebp-source.webp
@@ -675,6 +851,7 @@ test_libwebp_source() {
 
 test_imlib2_source() {
   local src prefix loader_path lib_path pkgconfig_dir
+  local link_cmd=/tmp/imlib2-link.txt
 
   log_step "imlib2 (source)"
 
@@ -686,7 +863,7 @@ test_imlib2_source() {
     cd "$src"
     autoreconf -fi >/tmp/imlib2-autoreconf.log 2>&1
     ./configure --prefix="$prefix" >/tmp/imlib2-configure.log 2>&1
-    make -j"$(nproc)" >/tmp/imlib2-build.log 2>&1
+    make -j"$(nproc)" V=1 >/tmp/imlib2-build.log 2>&1
     make install >/tmp/imlib2-install.log 2>&1
   )
 
@@ -698,7 +875,8 @@ test_imlib2_source() {
   [[ -n "$lib_path" ]] || die "unable to locate installed libImlib2 shared library"
   [[ -n "$pkgconfig_dir" ]] || die "unable to locate imlib2.pc"
 
-  assert_uses_original "$loader_path" /tmp/imlib2-loader-ldd.log
+  capture_last_matching_line /tmp/imlib2-build.log "gif.la" "$link_cmd"
+  assert_build_uses_active_giflib "imlib2-source" "$loader_path" /tmp/imlib2-loader-ldd.log "$link_cmd"
 
   cat > /tmp/imlib2-smoke.c <<'C'
 #include <stdio.h>
@@ -734,14 +912,15 @@ C
   require_contains /tmp/imlib2-runtime.log "$SAMPLE_WIDTH x $SAMPLE_HEIGHT"
 }
 
-SAMPLE_GIF="$ROOT/original/pic/welcome2.gif"
+SAMPLE_GIF="$ORIGINAL_ROOT/pic/welcome2.gif"
 if [[ ! -f "$SAMPLE_GIF" ]]; then
-  SAMPLE_GIF="$ROOT/original/pic/treescap.gif"
+  SAMPLE_GIF="$ORIGINAL_ROOT/pic/treescap.gif"
 fi
 [[ -f "$SAMPLE_GIF" ]] || die "unable to locate a sample GIF fixture"
 
 validate_dependents_inventory
-build_original_giflib
+build_safe_packages
+install_safe_packages
 discover_sample_dimensions
 assert_runtime_linkage
 

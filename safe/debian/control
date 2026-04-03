@@ -1,0 +1,34 @@
+Source: giflib
+Section: libs
+Priority: optional
+Maintainer: SafeLibs Maintainers <safelibs@example.invalid>
+XSBC-Original-Maintainer: David Suárez <deiv@debian.org>
+Build-Depends:
+ cargo,
+ debhelper-compat (= 13),
+ rustc
+Standards-Version: 4.6.1
+Homepage: https://giflib.sourceforge.net/
+Rules-Requires-Root: no
+
+Package: libgif7
+Architecture: any
+Pre-Depends: ${misc:Pre-Depends}
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Multi-Arch: same
+Description: library for GIF images (library)
+ GIFLIB is a package of portable tools and library routines for working with
+ GIF images.
+ .
+ This package contains the library.
+
+Package: libgif-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends: libgif7 (= ${binary:Version}), ${misc:Depends}
+Description: library for GIF images (development)
+ GIFLIB is a package of portable tools and library routines for working with
+ GIF images.
+ .
+ This package contains the development files.

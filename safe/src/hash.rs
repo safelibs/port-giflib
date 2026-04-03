@@ -52,7 +52,7 @@ unsafe fn exists_hash_table_impl(HashTable: *mut GifHashTableType, Key: u32) -> 
     }
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn _InitHashTable() -> *mut GifHashTableType {
     catch_panic_or(ptr::null_mut(), || unsafe {
         let HashTable = alloc_struct::<GifHashTableType>();
@@ -64,21 +64,21 @@ pub unsafe extern "C" fn _InitHashTable() -> *mut GifHashTableType {
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn _ClearHashTable(HashTable: *mut GifHashTableType) {
     catch_panic_or((), || unsafe {
         clear_hash_table_impl(HashTable);
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn _InsertHashTable(HashTable: *mut GifHashTableType, Key: u32, Code: i32) {
     catch_panic_or((), || unsafe {
         insert_hash_table_impl(HashTable, Key, Code);
     })
 }
 
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub unsafe extern "C" fn _ExistsHashTable(HashTable: *mut GifHashTableType, Key: u32) -> i32 {
     catch_panic_or(-1, || unsafe { exists_hash_table_impl(HashTable, Key) })
 }
