@@ -494,19 +494,14 @@ unsafe fn put_screen_desc_impl(
     }
 
     unsafe {
+        (*GifFile).SColorMap = ptr::null_mut();
         (*GifFile).SWidth = Width;
         (*GifFile).SHeight = Height;
         (*GifFile).SColorResolution = ColorRes;
         (*GifFile).SBackGroundColor = BackGround;
     }
 
-    if unsafe { (*GifFile).SColorMap } != ColorMap.cast_mut() {
-        unsafe {
-            (*GifFile).SColorMap = ptr::null_mut();
-        }
-    }
-
-    if !ColorMap.is_null() && unsafe { (*GifFile).SColorMap.is_null() } {
+    if !ColorMap.is_null() {
         let cloned = unsafe { clone_color_map(ColorMap) };
         if cloned.is_null() {
             unsafe {
