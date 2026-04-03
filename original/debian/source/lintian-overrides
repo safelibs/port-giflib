@@ -1,0 +1,20 @@
+# don't use the redirector 
+giflib source: debian-watch-lacks-sourceforge-redirector
+# all of these are built from xml files in the same directory.
+giflib source: source-is-missing [doc/gif2rgb.html]
+giflib source: source-is-missing [doc/gif_lib.html]
+giflib source: source-is-missing [doc/gifbg.html]
+giflib source: source-is-missing [doc/gifbuild.html]
+giflib source: source-is-missing [doc/gifclrmp.html]
+giflib source: source-is-missing [doc/gifcolor.html]
+giflib source: source-is-missing [doc/gifecho.html]
+giflib source: source-is-missing [doc/giffilter.html]
+giflib source: source-is-missing [doc/giffix.html]
+giflib source: source-is-missing [doc/gifhisto.html]
+giflib source: source-is-missing [doc/gifinto.html]
+giflib source: source-is-missing [doc/giflib.html]
+giflib source: source-is-missing [doc/gifsponge.html]
+giflib source: source-is-missing [doc/giftext.html]
+giflib source: source-is-missing [doc/giftool.html]
+giflib source: source-is-missing [doc/gifwedge.html]
+giflib source: source-is-missing [doc/intro.html]

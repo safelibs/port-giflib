@@ -1,0 +1,24 @@
+Description: Fix incorrect length args to snprintf
+Author: Adam Sampson
+Bug: https://sourceforge.net/p/giflib/bugs/170/
+
+--- giflib-5.2.2/giftext.c	2024-02-19 03:01:28.000000000 +0000
++++ giflib-5.2.2/giftext.c	2024-04-04 19:20:51.474029582 +0100
+@@ -442,7 +442,7 @@
+ 		for (i = 1; i <= Len; i++) {
+ 			(void)snprintf(&HexForm[CrntPlace * 3], 3, " %02x",
+ 			               Extension[i]);
+-			(void)snprintf(&AsciiForm[CrntPlace], 3, "%c",
++			(void)snprintf(&AsciiForm[CrntPlace], 2, "%c",
+ 			               MAKE_PRINTABLE(Extension[i]));
+ 			if (++CrntPlace == 16) {
+ 				HexForm[CrntPlace * 3] = 0;
+@@ -488,7 +488,7 @@
+ 	for (i = 0; i < Len; i++) {
+ 		(void)snprintf(&HexForm[CrntPlace * 3], 3, " %02x",
+ 		               PixelBlock[i]);
+-		(void)snprintf(&AsciiForm[CrntPlace], 3, "%c",
++		(void)snprintf(&AsciiForm[CrntPlace], 2, "%c",
+ 		               MAKE_PRINTABLE(PixelBlock[i]));
+ 		if (++CrntPlace == 16) {
+ 			HexForm[CrntPlace * 3] = 0;

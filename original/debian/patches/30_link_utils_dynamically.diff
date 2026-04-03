@@ -1,0 +1,60 @@
+Description: Link giflib-tools dynamically against giflib
+Author: Andreas Metzler <ametzler@debian.org>
+Origin: vendor
+Bug: https://sourceforge.net/p/giflib/bugs/123/
+Last-Update: 2024-02-24
+
+--- a/Makefile
++++ b/Makefile
+@@ -59,11 +59,11 @@ UTILS = $(INSTALLABLE) \
+ 	gifhisto \
+ 	gifinto \
+ 	gifsponge \
+ 	gifwedge
+ 
+-LDLIBS=libgif.a -lm
++LDLIBS=-lm
+ 
+ MANUAL_PAGES_1 = \
+ 	doc/gif2rgb.xml \
+ 	doc/gifbuild.xml \
+ 	doc/gifclrmp.xml \
+@@ -95,19 +95,22 @@ all: $(LIBGIFSO) libgif.a $(LIBUTILSO) l
+ ifeq ($(UNAME), Darwin)
+ else
+ 	$(MAKE) -C doc
+ endif
+
+-$(UTILS):: libgif.a libutil.a
++$(UTILS):: $(LIBGIFSOMAJOR) libutil.a
+ 
+ $(LIBGIFSO): $(OBJECTS) $(HEADERS)
+ ifeq ($(UNAME), Darwin)
+ 	$(CC) $(CFLAGS) -dynamiclib -current_version $(LIBVER) $(OBJECTS) -o $(LIBGIFSO)
+ else
+ 	$(CC) $(CFLAGS) -shared $(LDFLAGS) -Wl,-soname -Wl,$(LIBGIFSOMAJOR) -o $(LIBGIFSO) $(OBJECTS)
+ endif
+
++$(LIBGIFSOMAJOR): $(LIBGIFSO)
++	ln -s $< $@
++
+ libgif.a: $(OBJECTS) $(HEADERS)
+ 	$(AR) rcs libgif.a $(OBJECTS)
+ 
+ $(LIBUTILSO): $(UOBJECTS) $(UHEADERS)
+ ifeq ($(UNAME), Darwin)
+--- a/tests/makefile
++++ b/tests/makefile
+@@ -1,10 +1,12 @@
+ # Regression-test suite for the giflib library and tools
+ # All utilities have tests except gifbg, gifcolor, and gifhisto.
+ 
+ .SUFFIXES: .gif .rgb
+ 
++export LD_LIBRARY_PATH=$(CURDIR)/..
++
+ # This is what to do by default
+ test: render-regress \
+ 	gifbuild-regress \
+ 	gifclrmp-regress \
+ 	gifecho-regress \

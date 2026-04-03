@@ -1,0 +1,8 @@
+dont-build-html-pages-images.diff
+Correct-document-page-install.patch
+revert-GifQuantizeBuffer-remove-from-lib.patch
+30_link_utils_dynamically.diff
+dont-spoil-tests-with-stderr.patch
+giflib_quantize-header.patch
+Clean-up-memory-better-at-end-of-run-CVE-2021-40633.patch
+snprintf.patch

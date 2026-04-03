@@ -1,0 +1,57 @@
+#!/usr/bin/make -f
+
+export DH_ALWAYS_EXCLUDE=CVS:.idea
+
+# Include /usr/share/dpkg/pkg-info.mk to get DEB_{SOURCE,VERSION}
+include /usr/share/dpkg/pkg-info.mk
+
+# Include /usr/share/dpkg/architecture.mk to get DEB_HOST_{MULTI,}ARCH
+include /usr/share/dpkg/architecture.mk
+
+export DEB_BUILD_MAINT_OPTIONS := hardening=+all
+export DPKG_GENSYMBOLS_CHECK_LEVEL := 4
+
+doc_html = \
+	doc/gif_lib.html \
+	doc/gif2rgb.html \
+	doc/gifbuild.html \
+	doc/gifclrmp.html \
+	doc/gifecho.html \
+	doc/giffilter.html \
+	doc/giffix.html \
+	doc/gifinto.html \
+	doc/giflib.html \
+	doc/gifsponge.html \
+	doc/giftext.html \
+	doc/giftool.html \
+	doc/intro.html
+
+%:
+	dh ${@}
+
+override_dh_auto_build:
+	dh_auto_build -- OFLAGS="$(CPPFLAGS) $(CFLAGS) $(LDFLAGS)" \
+		PREFIX=/usr \
+		LIBDIR=/usr/lib/$(DEB_TARGET_MULTIARCH)
+
+override_dh_auto_install:
+	# Installing pkgconfig information
+	mkdir -p debian/tmp/usr/lib/$(DEB_TARGET_MULTIARCH)/pkgconfig
+	sed -e "s/@DEB_TARGET_MULTIARCH@/$(DEB_TARGET_MULTIARCH)/" \
+		-e "s/@VERSION@/$(DEB_VERSION_UPSTREAM)/" \
+		debian/pkgconfig/libgif7.pc.in \
+		1>debian/tmp/usr/lib/$(DEB_TARGET_MULTIARCH)/pkgconfig/libgif7.pc
+	ln -sf /usr/lib/$(DEB_TARGET_MULTIARCH)/pkgconfig/libgif7.pc \
+		debian/tmp/usr/lib/$(DEB_TARGET_MULTIARCH)/pkgconfig/libgif.pc
+
+	# Performing an installation step
+	dh_auto_install -- PREFIX=/usr \
+		LIBDIR=/usr/lib/$(DEB_TARGET_MULTIARCH)
+
+	# Installing additional documentation
+	mkdir -p debian/giflib-tools/usr/share/doc/giflib-tools/html
+	cp -a $(doc_html) debian/giflib-tools/usr/share/doc/giflib-tools/html
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -f doc/*.1 doc/*.html
