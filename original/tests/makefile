@@ -155,10 +155,7 @@ giftool-regress: public_api_regress
 
 gifwedge-regress: public_api_regress
 	@echo "gifwedge: Checking wedge generation through public APIs."
-	@$(APITEST) generate wedge | $(APITEST) render - >$@.actual
-	@$(APITEST) render wedge.gif >$@.expected
-	@cmp $@.expected $@.actual
-	@rm -f $@.actual $@.expected
+	@$(APITEST) generate wedge | cmp - wedge.gif
 
 gifwedge-rebuild: public_api_regress
 	@echo "Remaking the gifwedge fixture."
