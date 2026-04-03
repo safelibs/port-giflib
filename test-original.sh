@@ -107,6 +107,18 @@ require_contains() {
   fi
 }
 
+require_not_contains() {
+  local path="$1"
+  local needle="$2"
+
+  if grep -F -- "$needle" "$path" >/dev/null 2>&1; then
+    printf 'found unexpected text in %s: %s\n' "$path" "$needle" >&2
+    printf -- '--- %s ---\n' "$path" >&2
+    cat "$path" >&2
+    exit 1
+  fi
+}
+
 require_regex() {
   local path="$1"
   local regex="$2"
@@ -206,6 +218,176 @@ PY
   )
 }
 
+build_fbi_fakefb_shim() {
+  local src=/tmp/fbi-fakefb.c
+  local so=/tmp/fbi-fakefb.so
+
+  if [[ -x "$so" ]]; then
+    return
+  fi
+
+  cat > "$src" <<'C'
+#define _GNU_SOURCE
+
+#include <dlfcn.h>
+#include <fcntl.h>
+#include <linux/fb.h>
+#include <linux/kd.h>
+#include <linux/vt.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
+
+static int (*real_open_fn)(const char *, int, ...);
+static int (*real_ioctl_fn)(int, unsigned long, ...);
+static const char *fakefb_path;
+static int fakefb_fd = -1;
+static struct fb_var_screeninfo fake_var;
+static struct fb_fix_screeninfo fake_fix;
+
+static void init_fakefb(void) {
+  if (!real_open_fn) real_open_fn = dlsym(RTLD_NEXT, "open");
+  if (!real_ioctl_fn) real_ioctl_fn = dlsym(RTLD_NEXT, "ioctl");
+  if (!fakefb_path) fakefb_path = getenv("FBI_FAKEFB_PATH");
+  if (!fakefb_path) fakefb_path = "/tmp/fbi-fakefb";
+  if (fake_fix.smem_len != 0) return;
+
+  memset(&fake_var, 0, sizeof(fake_var));
+  memset(&fake_fix, 0, sizeof(fake_fix));
+
+  fake_var.xres = 64;
+  fake_var.yres = 64;
+  fake_var.xres_virtual = 64;
+  fake_var.yres_virtual = 64;
+  fake_var.bits_per_pixel = 32;
+  fake_var.red.offset = 16;
+  fake_var.red.length = 8;
+  fake_var.green.offset = 8;
+  fake_var.green.length = 8;
+  fake_var.blue.offset = 0;
+  fake_var.blue.length = 8;
+  fake_var.transp.offset = 24;
+  fake_var.transp.length = 8;
+
+  fake_fix.type = FB_TYPE_PACKED_PIXELS;
+  fake_fix.visual = FB_VISUAL_TRUECOLOR;
+  fake_fix.line_length = fake_var.xres * 4;
+  fake_fix.smem_len = fake_fix.line_length * fake_var.yres;
+  memcpy(fake_fix.id, "fakefb", 7);
+}
+
+int open(const char *path, int flags, ...) {
+  int fd;
+  mode_t mode = 0;
+
+  init_fakefb();
+  if (flags & O_CREAT) {
+    va_list ap;
+    va_start(ap, flags);
+    mode = va_arg(ap, mode_t);
+    va_end(ap);
+    fd = real_open_fn(path, flags, mode);
+  } else {
+    fd = real_open_fn(path, flags);
+  }
+
+  if (fd >= 0 && strcmp(path, fakefb_path) == 0) {
+    fakefb_fd = fd;
+  }
+  return fd;
+}
+
+int ioctl(int fd, unsigned long request, ...) {
+  void *arg;
+
+  init_fakefb();
+  va_list ap;
+  va_start(ap, request);
+  arg = va_arg(ap, void *);
+  va_end(ap);
+
+  if (fd == 0) {
+    switch (request) {
+    case VT_GETSTATE: {
+      struct vt_stat *state = arg;
+      memset(state, 0, sizeof(*state));
+      state->v_active = 1;
+      return 0;
+    }
+    case KDGETMODE:
+      *(int *)arg = KD_TEXT;
+      return 0;
+    case VT_GETMODE: {
+      struct vt_mode *mode = arg;
+      memset(mode, 0, sizeof(*mode));
+      mode->mode = VT_AUTO;
+      return 0;
+    }
+    case VT_SETMODE:
+    case VT_ACTIVATE:
+    case VT_WAITACTIVE:
+    case VT_RELDISP:
+    case KDSETMODE:
+      return 0;
+    default:
+      break;
+    }
+  }
+
+  if (fd == fakefb_fd) {
+    switch (request) {
+    case FBIOGET_VSCREENINFO:
+      memcpy(arg, &fake_var, sizeof(fake_var));
+      return 0;
+    case FBIOPUT_VSCREENINFO:
+      memcpy(&fake_var, arg, sizeof(fake_var));
+      return 0;
+    case FBIOGET_FSCREENINFO:
+      memcpy(arg, &fake_fix, sizeof(fake_fix));
+      return 0;
+    case FBIOPAN_DISPLAY:
+      return 0;
+    default:
+      break;
+    }
+  }
+
+  return real_ioctl_fn(fd, request, arg);
+}
+C
+
+  cc -shared -fPIC -O2 -o "$so" "$src" -ldl >/tmp/fbi-fakefb-build.log 2>&1
+}
+
+capture_mtpaint_window_title() {
+  local input="$1"
+  local log="$2"
+
+  INPUT_IMAGE="$input" WINDOW_LOG="$log" timeout 20 xvfb-run -a bash -c '
+    set -euo pipefail
+    mtpaint -v "$INPUT_IMAGE" >/tmp/mtpaint-runtime.log 2>&1 &
+    pid=$!
+    wid=""
+    for _ in $(seq 1 40); do
+      if ! kill -0 "$pid" 2>/dev/null; then
+        wait "$pid"
+        exit 1
+      fi
+      wid="$(xdotool search --onlyvisible --pid "$pid" 2>/dev/null | head -n1 || true)"
+      if [[ -n "$wid" ]]; then
+        break
+      fi
+      sleep 0.25
+    done
+    [[ -n "$wid" ]]
+    xdotool getwindowname "$wid" > "$WINDOW_LOG" || true
+    kill "$pid" >/dev/null 2>&1 || true
+    wait "$pid" || true
+  '
+}
+
 assert_runtime_linkage() {
   local multiarch
   local libgdal_path
@@ -242,49 +424,47 @@ test_webp_runtime() {
 }
 
 test_fbi_runtime() {
-  local status=0
+  local fakefb=/tmp/fbi-fakefb
+  local bad_input=/tmp/fbi-not-a-gif.gif
 
   log_step "fbi"
 
-  set +e
-  strace -f -e trace=file -o /tmp/fbi-runtime.strace fbi "$SAMPLE_GIF" >/tmp/fbi-runtime.log 2>&1
-  status=$?
-  set -e
+  build_fbi_fakefb_shim
 
-  if [[ "$status" -ne 0 ]]; then
-    require_regex /tmp/fbi-runtime.log 'No such file or directory|framebuffer|open /dev/fb|not a linux console'
-  fi
+  truncate -s 16384 "$fakefb"
+  printf '' | env LD_PRELOAD=/tmp/fbi-fakefb.so FBI_FAKEFB_PATH="$fakefb" \
+    strace -f -e execve -o /tmp/fbi-gif-execve.log \
+    fbi -d "$fakefb" -1 -t 1 "$SAMPLE_GIF" >/tmp/fbi-runtime.log 2>&1
 
-  require_contains /tmp/fbi-runtime.strace "$SAMPLE_GIF"
+  require_contains /tmp/fbi-gif-execve.log "$SAMPLE_GIF"
+  require_not_contains /tmp/fbi-gif-execve.log "convert"
+  require_not_contains /tmp/fbi-runtime.log "FAILED"
+
+  printf 'not a gif\n' > "$bad_input"
+  truncate -s 16384 "$fakefb"
+  printf '' | env LD_PRELOAD=/tmp/fbi-fakefb.so FBI_FAKEFB_PATH="$fakefb" \
+    strace -f -e execve -o /tmp/fbi-bad-execve.log \
+    fbi -d "$fakefb" -1 -t 1 "$bad_input" >/tmp/fbi-bad.log 2>&1 || true
+
+  require_contains /tmp/fbi-bad-execve.log "convert"
+  require_contains /tmp/fbi-bad.log "loading $bad_input"
+  require_contains /tmp/fbi-bad.log "FAILED"
 }
 
 test_mtpaint_runtime() {
+  local bad_input=/tmp/mtpaint-not-a-gif.gif
+
   log_step "mtpaint"
 
-  SAMPLE_GIF="$SAMPLE_GIF" timeout 20 xvfb-run -a bash -c '
-    set -euo pipefail
-    mtpaint -v "$SAMPLE_GIF" >/tmp/mtpaint-runtime.log 2>&1 &
-    pid=$!
-    wid=""
-    for _ in $(seq 1 40); do
-      if ! kill -0 "$pid" 2>/dev/null; then
-        wait "$pid"
-        exit 1
-      fi
-      wid="$(xdotool search --onlyvisible --pid "$pid" 2>/dev/null | head -n1 || true)"
-      if [[ -n "$wid" ]]; then
-        break
-      fi
-      sleep 0.25
-    done
-    [[ -n "$wid" ]]
-    xdotool getwindowname "$wid" > /tmp/mtpaint-window.log || true
-    kill "$pid" >/dev/null 2>&1 || true
-    wait "$pid" || true
-  '
+  capture_mtpaint_window_title "$SAMPLE_GIF" /tmp/mtpaint-window.log
 
   require_nonempty_file /tmp/mtpaint-window.log
-  require_regex /tmp/mtpaint-window.log '(mtPaint|welcome2|treescap|gif)'
+  require_contains /tmp/mtpaint-window.log "$SAMPLE_GIF"
+
+  printf 'not a gif\n' > "$bad_input"
+  capture_mtpaint_window_title "$bad_input" /tmp/mtpaint-bad-window.log
+  require_nonempty_file /tmp/mtpaint-bad-window.log
+  require_not_contains /tmp/mtpaint-bad-window.log "$bad_input"
 }
 
 test_tracker_extract_runtime() {
