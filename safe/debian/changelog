@@ -1,5 +1,8 @@
-giflib (5.2.2-1ubuntu1+safelibs1) noble; urgency=medium
+giflib (5.2.2-1ubuntu1+safelibs2) noble; urgency=medium
 
-  * Build the Rust port as local libgif7 and libgif-dev replacement packages.
+  * Lock the library-only package contents to the upstream libgif7/libgif-dev
+    install surface.
+  * Scope the downstream Docker harness while keeping one shared package setup
+    pass per run.
 
- -- SafeLibs Maintainers <safelibs@example.invalid>  Fri, 03 Apr 2026 09:00:00 -0700
+ -- SafeLibs Maintainers <safelibs@example.invalid>  Fri, 03 Apr 2026 10:30:00 -0700

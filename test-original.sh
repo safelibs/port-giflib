@@ -3,6 +3,76 @@ set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE_TAG="${GIFLIB_ORIGINAL_TEST_IMAGE:-giflib-original-test:ubuntu24.04}"
+GIFLIB_TEST_SCOPE="${GIFLIB_TEST_SCOPE:-all}"
+
+usage() {
+  cat <<'EOF'
+usage: test-original.sh [--scope runtime|source|all] [--help]
+
+Run downstream GIFLIB replacement checks inside the Docker harness.
+
+Options:
+  --scope runtime|source|all  Select which downstream subset to run.
+                              Default: all.
+  --help                      Show this help and exit.
+
+Environment:
+  GIFLIB_TEST_SCOPE           Default scope when --scope is not passed.
+                              Default: all.
+  GIFLIB_ORIGINAL_TEST_IMAGE  Docker image tag to use for the harness image.
+EOF
+}
+
+parse_args() {
+  while (($#)); do
+    case "$1" in
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      --scope)
+        shift
+        if (($# == 0)); then
+          echo "missing value for --scope" >&2
+          usage >&2
+          exit 1
+        fi
+        GIFLIB_TEST_SCOPE="$1"
+        ;;
+      --scope=*)
+        GIFLIB_TEST_SCOPE="${1#*=}"
+        ;;
+      --)
+        shift
+        if (($# != 0)); then
+          echo "unexpected argument: $1" >&2
+          usage >&2
+          exit 1
+        fi
+        break
+        ;;
+      *)
+        echo "unexpected argument: $1" >&2
+        usage >&2
+        exit 1
+        ;;
+    esac
+    shift
+  done
+
+  case "$GIFLIB_TEST_SCOPE" in
+    runtime|source|all) ;;
+    *)
+      echo "invalid scope: $GIFLIB_TEST_SCOPE" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+
+  export GIFLIB_TEST_SCOPE
+}
+
+parse_args "$@"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker is required to run $0" >&2
@@ -77,7 +147,7 @@ COPY \./original /work/original/
 WORKDIR /work
 DOCKERFILE
 
-docker run --rm -i "$IMAGE_TAG" bash <<'CONTAINER_SCRIPT'
+docker run --rm -i -e GIFLIB_TEST_SCOPE="$GIFLIB_TEST_SCOPE" "$IMAGE_TAG" bash <<'CONTAINER_SCRIPT'
 set -euo pipefail
 
 export LANG=C.UTF-8
@@ -88,6 +158,7 @@ ROOT=/work
 SAFE_ROOT=/work/safe
 ORIGINAL_ROOT=/work/original
 DOWNSTREAM_ROOT=/tmp/giflib-dependent-sources
+GIFLIB_TEST_SCOPE="${GIFLIB_TEST_SCOPE:-all}"
 
 log_step() {
   printf '\n==> %s\n' "$1"
@@ -143,10 +214,18 @@ require_regex() {
 build_safe_packages() {
   local runtime_matches
   local dev_matches
+  local dbgsym_matches
+  local changes_matches
+  local buildinfo_matches
 
   log_step "Building safe Debian packages"
 
-  rm -f "$ROOT"/libgif7_*.deb "$ROOT"/libgif-dev_*.deb "$ROOT"/libgif7-dbgsym_*.deb
+  rm -f \
+    "$ROOT"/libgif7_*.deb \
+    "$ROOT"/libgif-dev_*.deb \
+    "$ROOT"/libgif7-dbgsym_*.ddeb \
+    "$ROOT"/giflib_*.changes \
+    "$ROOT"/giflib_*.buildinfo
   if ! (
     cd "$SAFE_ROOT"
     dpkg-buildpackage -us -uc -b >/tmp/safe-dpkg-build.log 2>&1
@@ -155,14 +234,40 @@ build_safe_packages() {
     exit 1
   fi
 
+  if find "$ROOT" -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) \
+    ! -name 'libgif7_*.deb' \
+    ! -name 'libgif-dev_*.deb' \
+    ! -name 'libgif7-dbgsym_*.ddeb' \
+    | grep -q .; then
+    find "$ROOT" -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) >&2
+    die "unexpected non-library Debian package artifact"
+  fi
+
+  if find "$ROOT" -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) \
+    ! -name 'giflib_*.changes' \
+    ! -name 'giflib_*.buildinfo' \
+    | grep -q .; then
+    find "$ROOT" -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) >&2
+    die "unexpected non-giflib build metadata artifact"
+  fi
+
   runtime_matches="$(find "$ROOT" -maxdepth 1 -type f -name 'libgif7_*.deb' | LC_ALL=C sort)"
   dev_matches="$(find "$ROOT" -maxdepth 1 -type f -name 'libgif-dev_*.deb' | LC_ALL=C sort)"
+  dbgsym_matches="$(find "$ROOT" -maxdepth 1 -type f -name 'libgif7-dbgsym_*.ddeb' | LC_ALL=C sort)"
+  changes_matches="$(find "$ROOT" -maxdepth 1 -type f -name 'giflib_*.changes' | LC_ALL=C sort)"
+  buildinfo_matches="$(find "$ROOT" -maxdepth 1 -type f -name 'giflib_*.buildinfo' | LC_ALL=C sort)"
 
   [[ "$(printf '%s\n' "$runtime_matches" | sed '/^$/d' | wc -l)" -eq 1 ]] || die "expected exactly one libgif7 Debian package"
   [[ "$(printf '%s\n' "$dev_matches" | sed '/^$/d' | wc -l)" -eq 1 ]] || die "expected exactly one libgif-dev Debian package"
+  [[ "$(printf '%s\n' "$dbgsym_matches" | sed '/^$/d' | wc -l)" -eq 1 ]] || die "expected exactly one libgif7-dbgsym package"
+  [[ "$(printf '%s\n' "$changes_matches" | sed '/^$/d' | wc -l)" -eq 1 ]] || die "expected exactly one giflib .changes file"
+  [[ "$(printf '%s\n' "$buildinfo_matches" | sed '/^$/d' | wc -l)" -eq 1 ]] || die "expected exactly one giflib .buildinfo file"
 
   SAFE_RUNTIME_DEB="$(printf '%s\n' "$runtime_matches" | head -n1)"
   SAFE_DEV_DEB="$(printf '%s\n' "$dev_matches" | head -n1)"
+  SAFE_RUNTIME_DBGSYM="$(printf '%s\n' "$dbgsym_matches" | head -n1)"
+  SAFE_CHANGES_FILE="$(printf '%s\n' "$changes_matches" | head -n1)"
+  SAFE_BUILDINFO_FILE="$(printf '%s\n' "$buildinfo_matches" | head -n1)"
   SAFE_RUNTIME_PACKAGE="$(dpkg-deb -f "$SAFE_RUNTIME_DEB" Package)"
   SAFE_RUNTIME_VERSION="$(dpkg-deb -f "$SAFE_RUNTIME_DEB" Version)"
   SAFE_DEV_PACKAGE="$(dpkg-deb -f "$SAFE_DEV_DEB" Package)"
@@ -170,13 +275,22 @@ build_safe_packages() {
 
   [[ "$SAFE_RUNTIME_PACKAGE" == "libgif7" ]] || die "unexpected runtime package name: $SAFE_RUNTIME_PACKAGE"
   [[ "$SAFE_DEV_PACKAGE" == "libgif-dev" ]] || die "unexpected development package name: $SAFE_DEV_PACKAGE"
+  case "$SAFE_RUNTIME_VERSION" in
+    *+safelibs*) ;;
+    *) die "missing local safelibs version suffix in runtime package version" ;;
+  esac
+  [[ "$SAFE_DEV_VERSION" == "$SAFE_RUNTIME_VERSION" ]] || die "development package version mismatch"
 
   export SAFE_RUNTIME_DEB SAFE_DEV_DEB
+  export SAFE_RUNTIME_DBGSYM SAFE_CHANGES_FILE SAFE_BUILDINFO_FILE
   export SAFE_RUNTIME_PACKAGE SAFE_RUNTIME_VERSION
   export SAFE_DEV_PACKAGE SAFE_DEV_VERSION
 
   printf 'SAFE_RUNTIME_DEB=%s\n' "$SAFE_RUNTIME_DEB"
   printf 'SAFE_DEV_DEB=%s\n' "$SAFE_DEV_DEB"
+  printf 'SAFE_RUNTIME_DBGSYM=%s\n' "$SAFE_RUNTIME_DBGSYM"
+  printf 'SAFE_CHANGES_FILE=%s\n' "$SAFE_CHANGES_FILE"
+  printf 'SAFE_BUILDINFO_FILE=%s\n' "$SAFE_BUILDINFO_FILE"
   printf 'SAFE_RUNTIME_PACKAGE=%s\n' "$SAFE_RUNTIME_PACKAGE"
   printf 'SAFE_DEV_PACKAGE=%s\n' "$SAFE_DEV_PACKAGE"
   printf 'SAFE_RUNTIME_VERSION=%s\n' "$SAFE_RUNTIME_VERSION"
@@ -918,26 +1032,47 @@ if [[ ! -f "$SAMPLE_GIF" ]]; then
 fi
 [[ -f "$SAMPLE_GIF" ]] || die "unable to locate a sample GIF fixture"
 
-validate_dependents_inventory
-build_safe_packages
-install_safe_packages
-discover_sample_dimensions
-assert_runtime_linkage
+run_shared_setup() {
+  validate_dependents_inventory
+  build_safe_packages
+  install_safe_packages
+  discover_sample_dimensions
+  assert_runtime_linkage
+}
 
-test_giflib_tools
-test_webp_runtime
-test_fbi_runtime
-test_mtpaint_runtime
-test_tracker_extract_runtime
-test_libextractor_runtime
-test_camlimages_runtime
-test_gdal_runtime
+run_runtime_checks() {
+  test_giflib_tools
+  test_webp_runtime
+  test_fbi_runtime
+  test_mtpaint_runtime
+  test_tracker_extract_runtime
+  test_libextractor_runtime
+  test_camlimages_runtime
+  test_gdal_runtime
+}
 
-test_gdal_source
-test_exactimage_source
-test_sail_source
-test_libwebp_source
-test_imlib2_source
+run_source_checks() {
+  test_gdal_source
+  test_exactimage_source
+  test_sail_source
+  test_libwebp_source
+  test_imlib2_source
+}
+
+run_shared_setup
+
+case "$GIFLIB_TEST_SCOPE" in
+  runtime)
+    run_runtime_checks
+    ;;
+  source)
+    run_source_checks
+    ;;
+  all)
+    run_runtime_checks
+    run_source_checks
+    ;;
+esac
 
 log_step "All downstream checks passed"
 CONTAINER_SCRIPT

@@ -1,1 +1,2 @@
-/usr/lib/*/*.so.*
+/usr/lib/*/libgif.so.7
+/usr/lib/*/libgif.so.7.*
