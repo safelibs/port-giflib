@@ -4,11 +4,10 @@
 #include "gif_lib.h"
 
 /*
- * Runtime metadata reproducer for gif2webp, tracker-extract,
- * libextractor-plugin-gif, libcamlimages-ocaml, and libgdal34t64.
- * These consumers only need DGifSlurp to report correct dimensions,
- * frame counts, and interlace state for representative installed-library
- * decode workloads.
+ * Metadata/frame-count reproducer reused by runtime consumers plus the
+ * source-build gdal and libwebp local link-mode smokes. These consumers only
+ * need DGifSlurp to report correct dimensions, frame counts, and interlace
+ * state for representative public decode workloads.
  */
 
 static void fail(const char *path, const char *message) {

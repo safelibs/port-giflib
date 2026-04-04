@@ -14,6 +14,14 @@ temporary inputs during the test run. Do not vendor downstream source trees,
 copy oracle corpora out of `original/`, depend on the network, or depend on
 ambient machine state.
 
+When a source-build regression is really about install-surface metadata rather
+than decoder behavior, keep the local check just large enough to model the
+downstream expectation. It is acceptable to synthesize a tiny local sysroot
+from `safe/debian/pkgconfig/libgif7.pc.in`, reuse an existing reproducer source
+for a different link mode, or pair a compile smoke with a small shell-level
+assertion, as long as the committed test still fails without rebuilding a full
+downstream package.
+
 A tiny local fixture or expected-output file is acceptable only when it is the
 smallest practical artifact that captures the regression, is authored for the
 reproducer rather than copied from upstream/downstream packages, and its

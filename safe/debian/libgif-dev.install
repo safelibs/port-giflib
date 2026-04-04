@@ -1,5 +1,4 @@
 /usr/include/gif_lib.h
 /usr/lib/*/libgif.a
 /usr/lib/*/libgif.so
-/usr/lib/*/pkgconfig/libgif.pc
-/usr/lib/*/pkgconfig/libgif7.pc
+/usr/lib/*/pkgconfig/*

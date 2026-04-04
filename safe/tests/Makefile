@@ -15,6 +15,10 @@ ORIGINAL_TESTS_DIR ?= ../../original/tests
 ORIGINAL_PIC_DIR ?= ../../original/pic
 LIBGIF_INCLUDEDIR ?= ../include
 LIBGIF_LIBDIR ?= ../target/release
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || gcc -print-multiarch)
+LIBGIF_RPATH = $(abspath $(LIBGIF_LIBDIR))
+LIBGIF_PC_TEMPLATE ?= ../debian/pkgconfig/libgif7.pc.in
+LIBGIF_PC_VERSION ?= $(shell dpkg-parsechangelog -l ../debian/changelog -SVersion 2>/dev/null | sed 's/+.*//')
 
 PICS = $(ORIGINAL_PIC_DIR)
 GIFS := $(sort $(wildcard $(ORIGINAL_PIC_DIR)/*.gif))
@@ -40,14 +44,30 @@ COMPAT_CFLAGS = $(CPPFLAGS) $(CFLAGS) -std=gnu99 -Wall -Wextra -I$(LIBGIF_INCLUD
 COMPAT_RUNTIME_EMPTY_COMMENT = $(COMPAT_DIR)/sf-103-empty-comment/slurp_empty_comment
 COMPAT_RUNTIME_NO_IMAGE_DESC = $(COMPAT_DIR)/sf-64-no-image-desc/no_image_desc
 COMPAT_RUNTIME_METADATA = $(COMPAT_DIR)/runtime-metadata/slurp_metadata
+COMPAT_SOURCE_GDAL_SHARED = $(COMPAT_DIR)/runtime-metadata/slurp_metadata.gdal-shared
+COMPAT_SOURCE_EXACTIMAGE = $(COMPAT_DIR)/source-exactimage-memory-roundtrip/exactimage_memory_roundtrip
+COMPAT_SOURCE_IMLIB2 = $(COMPAT_DIR)/source-imlib2-sequential/imlib2_sequential_decode
+COMPAT_SOURCE_SAIL_SYSROOT = $(COMPAT_DIR)/source-sail-pkgconfig/sysroot
+COMPAT_SOURCE_SAIL_PKGCONFIG_DIR = $(COMPAT_SOURCE_SAIL_SYSROOT)/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig
+COMPAT_SOURCE_SAIL_PC = $(COMPAT_SOURCE_SAIL_PKGCONFIG_DIR)/libgif7.pc
+COMPAT_SOURCE_SAIL = $(COMPAT_DIR)/source-sail-pkgconfig/sail_pkgconfig_smoke
 COMPAT_BINS = \
 	$(COMPAT_RUNTIME_EMPTY_COMMENT) \
 	$(COMPAT_RUNTIME_NO_IMAGE_DESC) \
-	$(COMPAT_RUNTIME_METADATA)
+	$(COMPAT_RUNTIME_METADATA) \
+	$(COMPAT_SOURCE_GDAL_SHARED) \
+	$(COMPAT_SOURCE_EXACTIMAGE) \
+	$(COMPAT_SOURCE_IMLIB2) \
+	$(COMPAT_SOURCE_SAIL)
 COMPAT_REGRESS_TARGETS := \
 	compat-runtime-sf-103-empty-comment-regress \
 	compat-runtime-sf-64-no-image-desc-regress \
-	compat-runtime-metadata-regress
+	compat-runtime-metadata-regress \
+	compat-source-gdal-shared-link-regress \
+	compat-source-exactimage-roundtrip-regress \
+	compat-source-sail-pkgconfig-regress \
+	compat-source-libwebp-static-link-regress \
+	compat-source-imlib2-sequential-regress
 
 .PHONY: test clean safe-header-regress link-compat-regress internal-export-regress \
 	legacy-regress fileio-regress alloc-regress render-regress gif2rgb-regress \
@@ -269,7 +289,60 @@ compat-runtime-metadata-regress: $(COMPAT_RUNTIME_METADATA)
 	@$(COMPAT_RUNTIME_METADATA) $(PICS)/treescap-interlaced.gif 40 40 1 1
 	@$(COMPAT_RUNTIME_METADATA) $(PICS)/welcome2.gif 290 48 6 0
 
+$(COMPAT_SOURCE_GDAL_SHARED): $(COMPAT_DIR)/runtime-metadata/slurp_metadata.c $(LIBGIF_SHARED) $(SAFE_HEADER)
+	$(CC) $(COMPAT_CFLAGS) $< -L$(LIBGIF_RPATH) -Wl,-rpath,$(LIBGIF_RPATH) -lgif $(LDLIBS) -o $@
+
+compat-source-gdal-shared-link-regress: $(COMPAT_SOURCE_GDAL_SHARED)
+	@echo "compat(source): gdal-style shared-link slurp smoke."
+	@$(COMPAT_SOURCE_GDAL_SHARED) $(PICS)/treescap-interlaced.gif 40 40 1 1
+	@$(COMPAT_SOURCE_GDAL_SHARED) $(PICS)/welcome2.gif 290 48 6 0
+
+$(COMPAT_SOURCE_EXACTIMAGE): $(COMPAT_DIR)/source-exactimage-memory-roundtrip/exactimage_memory_roundtrip.c $(LIBGIF_SHARED) $(SAFE_HEADER)
+	$(CC) $(COMPAT_CFLAGS) $< -L$(LIBGIF_RPATH) -Wl,-rpath,$(LIBGIF_RPATH) -lgif $(LDLIBS) -o $@
+
+compat-source-exactimage-roundtrip-regress: $(COMPAT_SOURCE_EXACTIMAGE)
+	@echo "compat(source): exactimage-style public encode/decode roundtrip."
+	@$(COMPAT_SOURCE_EXACTIMAGE)
+
+$(COMPAT_SOURCE_SAIL_PC): $(LIBGIF_PC_TEMPLATE) $(LIBGIF_SHARED) $(SAFE_HEADER)
+	mkdir -p $(COMPAT_SOURCE_SAIL_PKGCONFIG_DIR) $(COMPAT_SOURCE_SAIL_SYSROOT)/usr/include $(COMPAT_SOURCE_SAIL_SYSROOT)/usr/lib/$(DEB_HOST_MULTIARCH)
+	ln -sf $(abspath $(SAFE_HEADER)) $(COMPAT_SOURCE_SAIL_SYSROOT)/usr/include/gif_lib.h
+	ln -sf $(abspath $(LIBGIF_SHARED)) $(COMPAT_SOURCE_SAIL_SYSROOT)/usr/lib/$(DEB_HOST_MULTIARCH)/libgif.so
+	sed -e "s/@DEB_TARGET_MULTIARCH@/$(DEB_HOST_MULTIARCH)/" \
+		-e "s/@VERSION@/$(LIBGIF_PC_VERSION)/" \
+		$< > $@
+	ln -sf libgif7.pc $(COMPAT_SOURCE_SAIL_PKGCONFIG_DIR)/libgif.pc
+
+$(COMPAT_SOURCE_SAIL): $(COMPAT_DIR)/source-sail-pkgconfig/sail_pkgconfig_smoke.c $(COMPAT_SOURCE_SAIL_PC)
+	env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR=$(COMPAT_SOURCE_SAIL_PKGCONFIG_DIR) \
+		PKG_CONFIG_SYSROOT_DIR=$(COMPAT_SOURCE_SAIL_SYSROOT) \
+		$(CC) $(CPPFLAGS) $(CFLAGS) -std=gnu99 -Wall -Wextra $< -o $@ \
+		$$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR=$(COMPAT_SOURCE_SAIL_PKGCONFIG_DIR) \
+			PKG_CONFIG_SYSROOT_DIR=$(COMPAT_SOURCE_SAIL_SYSROOT) \
+			pkg-config --cflags --libs libgif) \
+		-Wl,-rpath,$(LIBGIF_RPATH)
+
+compat-source-sail-pkgconfig-regress: $(COMPAT_SOURCE_SAIL)
+	@echo "compat(source): sail-style pkg-config alias and shared link smoke."
+	@env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR=$(COMPAT_SOURCE_SAIL_PKGCONFIG_DIR) PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif7
+	@env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR=$(COMPAT_SOURCE_SAIL_PKGCONFIG_DIR) PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif
+	@test "$$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR=$(COMPAT_SOURCE_SAIL_PKGCONFIG_DIR) PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=libdir libgif7)" = "/usr/lib/$(DEB_HOST_MULTIARCH)"
+	@test "$$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR=$(COMPAT_SOURCE_SAIL_PKGCONFIG_DIR) PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=includedir libgif7)" = "/usr/include"
+	@$(COMPAT_SOURCE_SAIL)
+
+compat-source-libwebp-static-link-regress: $(COMPAT_RUNTIME_METADATA)
+	@echo "compat(source): libwebp-style static-link slurp smoke."
+	@$(COMPAT_RUNTIME_METADATA) $(PICS)/fire.gif 30 60 33 1
+
+$(COMPAT_SOURCE_IMLIB2): $(COMPAT_DIR)/source-imlib2-sequential/imlib2_sequential_decode.c $(LIBGIF_SHARED) $(SAFE_HEADER)
+	$(CC) $(COMPAT_CFLAGS) $< -L$(LIBGIF_RPATH) -Wl,-rpath,$(LIBGIF_RPATH) -lgif $(LDLIBS) -o $@
+
+compat-source-imlib2-sequential-regress: $(COMPAT_SOURCE_IMLIB2)
+	@echo "compat(source): imlib2-style sequential decode smoke."
+	@$(COMPAT_SOURCE_IMLIB2) $(PICS)/welcome2.gif 290 48 6
+
 clean:
 	rm -f $(APITEST) $(LINK_COMPAT_OBJ) $(LINK_COMPAT_STATIC) $(LINK_COMPAT_SHARED) \
 		$(INTERNAL_EXPORT_SMOKE) $(MALFORMED_OBSERVE) $(COMPAT_BINS) \
 		*.actual *.expected *.regress
+	rm -rf $(COMPAT_SOURCE_SAIL_SYSROOT)

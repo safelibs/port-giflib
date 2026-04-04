@@ -1,3 +1,12 @@
+giflib (5.2.2-1ubuntu1+safelibs3) noble; urgency=medium
+
+  * Add local source-matrix regressions for gdal, exactimage, sail, libwebp,
+    and imlib2 integration points.
+  * Reuse the packaged pkg-config metadata shape in local compat tests and
+    align the libgif.pc symlink layout with the original Debian package.
+
+ -- SafeLibs Maintainers <safelibs@example.invalid>  Fri, 03 Apr 2026 19:45:00 -0700
+
 giflib (5.2.2-1ubuntu1+safelibs2) noble; urgency=medium
 
   * Lock the library-only package contents to the upstream libgif7/libgif-dev
