@@ -35,12 +35,14 @@ MALFORMED_FIXTURES := $(sort $(wildcard $(MALFORMED_DIR)/*.gif))
 MALFORMED_BASELINE = $(MALFORMED_DIR)/original-baseline.txt
 MALFORMED_OBSERVE = ./malformed_observe
 MALFORMED_CAPTURE = ./capture_malformed_baseline.sh
+COMPAT_REGRESS_TARGETS :=
 
 .PHONY: test clean safe-header-regress link-compat-regress internal-export-regress \
 	legacy-regress fileio-regress alloc-regress render-regress gif2rgb-regress \
 	gifbuild-regress gifclrmp-regress gifecho-regress giffilter-regress \
 	giffix-regress gifsponge-regress drawing-regress giftext-regress \
-	giftool-regress gifwedge-regress malformed-regress malformed-baseline-regress
+	giftool-regress gifwedge-regress malformed-regress malformed-baseline-regress \
+	compat-regress $(COMPAT_REGRESS_TARGETS)
 
 test: $(APITEST) \
 	render-regress \
@@ -58,7 +60,8 @@ test: $(APITEST) \
 	giftool-regress \
 	gifwedge-regress \
 	malformed-regress \
-	malformed-baseline-regress
+	malformed-baseline-regress \
+	compat-regress
 	@echo "No output is good news"
 
 $(APITEST): $(APITEST_SRC) $(LIBGIF_STATIC) $(SAFE_HEADER)
@@ -196,6 +199,13 @@ malformed-baseline-regress: $(MALFORMED_OBSERVE) $(MALFORMED_BASELINE) $(MALFORM
 	@$(MALFORMED_CAPTURE) $(MALFORMED_OBSERVE) $(MALFORMED_DIR) > $@.regress
 	@diff -u $(MALFORMED_BASELINE) $@.regress
 	@rm -f $@.regress
+
+compat-regress: $(COMPAT_REGRESS_TARGETS)
+ifeq ($(strip $(COMPAT_REGRESS_TARGETS)),)
+	@echo "compat: no issue-specific local reproducers registered."
+else
+	@echo "compat: completed $(words $(COMPAT_REGRESS_TARGETS)) registered issue-specific reproducers."
+endif
 
 link-compat-regress:
 	$(RM) $(LINK_COMPAT_OBJ) $(LINK_COMPAT_STATIC) $(LINK_COMPAT_SHARED)
