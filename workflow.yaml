@@ -1,0 +1,2944 @@
+# Generated inline from the committed `.plan/phases/*` docs and `.plan/workflow-structure.yaml`.
+linear: true
+yaml_source_mode: inline-only
+verifier_encoding: explicit-phases
+phases:
+- id: impl_01_local_contract
+  type: implement
+  bounce_target: null
+  prompt: |
+    You are implementing phase `impl_01_local_contract` for the GIFLIB compatibility workflow in this repository.
+    
+    Work from the repository root. This prompt is self-contained. Consume or update the existing artifacts listed below in place; do not refetch, recollect, rediscover, or regenerate them from scratch. Reuse and update the committed repository artifacts that already exist instead of recreating them from zero. Commit all phase work to git before yielding.
+    
+    # Phase 1
+    
+    ## Phase Name
+    Local Contract Lock And Regression Gap Closure
+    
+    ## Implement Phase ID
+    `impl_01_local_contract`
+    
+    ## Preexisting Inputs
+    - `safe/Cargo.toml`
+    - `safe/build.rs`
+    - `safe/src/`
+    - `safe/include/gif_lib.h`
+    - `safe/tests/Makefile`
+    - `safe/tests/abi_layout.c`
+    - `safe/tests/internal_exports_smoke.c`
+    - `safe/tests/malformed_observe.c`
+    - `safe/tests/capture_malformed_baseline.sh`
+    - `safe/tests/malformed/`
+    - `safe/tests/malformed/manifest.txt`
+    - `safe/tests/malformed/original-baseline.txt`
+    - `safe/tests/perf_compare.sh`
+    - `relevant_cves.json`
+    - `original/`
+    - `original/gif_lib.h`
+    - `original/gif_hash.h`
+    - `original/debian/libgif7.symbols`
+    - `original/tests/public_api_regress.c`
+    - `original/tests/`
+    - `original/pic/`
+    
+    ## New Outputs
+    - locked and explicitly verified local ABI, export, and regression baseline
+    - `safe/tests/compat/` scaffolding for later downstream reproducers
+    - deterministic `compat-regress` coverage in `safe/tests/Makefile`
+    - any local-only regression additions required before downstream phases begin
+    
+    ## File Changes
+    - update `safe/tests/Makefile`
+    - create `safe/tests/compat/`
+    - create `safe/tests/compat/README.md`
+    - update `safe/tests/abi_layout.c` only if the existing probe is incomplete
+    - update `safe/tests/internal_exports_smoke.c` only if local export coverage is incomplete
+    - update `safe/tests/perf_compare.sh` only if its current contract is incomplete
+    - update `safe/src/*.rs` only if the local verification rerun proves a real bug
+    
+    ## Implementation Details
+    - Preserve the current Rust-only production build. Do not reintroduce `original/*.c` into `safe/build.rs`, `safe/Cargo.toml`, or `safe/src/`.
+    - Preserve the byte-for-byte public header match between `safe/include/gif_lib.h` and `original/gif_lib.h`.
+    - Consume the existing malformed-input scope in place: keep using `relevant_cves.json`, `safe/tests/malformed/manifest.txt`, `safe/tests/malformed/original-baseline.txt`, and the committed malformed fixtures instead of regenerating them.
+    - Add `compat-regress` to `safe/tests/Makefile` as the single deterministic aggregator for future issue-specific downstream reproducers.
+    - Add `safe/tests/compat/README.md` that documents the reproducer naming convention, the requirement to register each reproducer in `safe/tests/Makefile`, the requirement to keep reproducers local, deterministic, and minimal, and when a tiny local fixture or expected-output file is acceptable together with its provenance rules.
+    - Keep consuming `original/tests/public_api_regress.c`, `original/tests/`, and `original/pic/` in place. Do not vendor oracle files into `safe/tests/`.
+    - Do not refactor `safe/src/` for style in this phase. Only change Rust implementation files if the local rerun proves an actual defect.
+    - Preserve the existing panic fencing in `safe/src/bootstrap.rs`, keep `#![deny(unsafe_op_in_unsafe_fn)]`, and keep `SAFETY:` commentary near remaining `unsafe` blocks.
+    - If this phase edits decoder/slurp/data-path files such as `safe/src/decode.rs`, `safe/src/slurp.rs`, `safe/src/io.rs`, `safe/src/state.rs`, or `safe/src/helpers.rs`, rerun `render-regress`, `gifclrmp-regress`, `giffilter-regress`, `giftext-regress`, `malformed-regress`, and `malformed-baseline-regress` before yielding.
+    - If this phase edits encoder/write/quantize/drawing files such as `safe/src/encode.rs`, `safe/src/gcb.rs`, `safe/src/helpers.rs`, `safe/src/quantize.rs`, or `safe/src/draw.rs`, rerun `gifbuild-regress`, `gifsponge-regress`, `giftool-regress`, `giffix-regress`, `gif2rgb-regress`, `gifecho-regress`, `drawing-regress`, and `gifwedge-regress` before yielding.
+    - If this phase edits hot-path files `safe/src/decode.rs`, `safe/src/encode.rs`, `safe/src/quantize.rs`, `safe/src/helpers.rs`, `safe/src/state.rs`, or `safe/src/io.rs`, rerun `safe/tests/perf_compare.sh` before yielding.
+    - If this phase edits FFI entry points or raw-pointer-heavy code, rerun the `SAFETY:` audit and keep panic fencing at the C ABI boundary before yielding.
+    - Do not edit `original/`, `dependents.json`, or `relevant_cves.json` in this phase unless the underlying oracle or analysis is proven wrong.
+    
+    ## Workflow Contract Requirements
+    - Generated workflow execution must stay linear. Do not use `parallel_groups`.
+    - Use self-contained inline YAML only and keep `yaml_source_mode: inline-only`. Do not use top-level `include`.
+    - Do not use phase-level `prompt_file`, `workflow_file`, `workflow_dir`, `checks`, or any other YAML-source indirection.
+    - Do not use agent-guided `bounce_targets` lists. Every verifier must use exactly one fixed `bounce_target`, remain an explicit top-level `check` phase, and stay inside the implement block it verifies.
+    - Keep verifier encoding explicit-phase only and preserve `verifier_encoding: explicit-phases`: every verifier remains a top-level `check` phase rather than an implicit or grouped check encoding.
+    - Every implement prompt must instruct the agent to commit work to git before yielding.
+    - Each implementation phase must yield exactly one non-merge git commit. If iterative local work happened, collapse it into one final phase commit before yielding.
+    - Each phase commit subject must start with the implement phase ID, and any review of a phase diff must inspect `HEAD^..HEAD` or an equivalent explicit single-commit range.
+    - Immediately before any implement phase yields, after the phase commit is created, the tracked worktree and index must already satisfy the tracked-clean contract: `git status --short --untracked-files=no` is empty, `git diff --quiet --exit-code` succeeds, and `git diff --cached --quiet --exit-code` succeeds.
+    - That same tracked-clean contract must already hold before any verifier, plan review, phase-doc regeneration, or workflow-regeneration step begins. Use this tracked-clean contract rather than a fully pristine-tree requirement; disposable untracked build outputs may exist.
+    - `.plan/plan.md` is the authoritative planning source for regenerated phase docs and workflow structure. Any later review or regeneration handoff is invalid if `.plan/plan.md` is modified relative to `HEAD`.
+    - Before regenerating `.plan/phases/*.md`, `.plan/workflow-structure.yaml`, or `workflow.yaml`, land a planning-only commit that updates only `.plan/*` and `workflow.yaml`, then satisfy the tracked-clean handoff contract. That planning commit must not modify `safe/`, `original/`, `dependents.json`, `relevant_cves.json`, or other tracked implementation files.
+    - Every major implementation phase must have at least one command-heavy tester check and at least one senior-review check, and any verifier that needs build, package, Docker, benchmark, lint, or test commands must carry those commands directly in the verifier instructions.
+    - Regenerate `.plan/phases/*.md`, `.plan/workflow-structure.yaml`, and `workflow.yaml` in place. Do not create alternate sibling planning or workflow files.
+    - Consume existing artifacts in place across the workflow: `original/`, `original/tests/`, `original/pic/`, `safe/`, `safe/tests/`, `safe/debian/`, `test-original.sh`, `dependents.json`, `relevant_cves.json`, and `safe/tests/malformed/*` are authoritative existing inputs, not rediscovery targets.
+    - Do not modify `dependents.json` unless the inventory itself is proven wrong, and do not recollect a new downstream app list. The existing 13-entry `dependents.json` inventory already satisfies the requirement to test roughly a dozen real consumers.
+    - Do not modify `relevant_cves.json` unless the scoped CVE analysis itself is proven wrong.
+    - Treat tracked files under `original/` as immutable oracle inputs. If any verifier needs a rebuilt original-library oracle, build it from a temporary copy of `original/`, never from the tracked tree. If tracked edits under `original/` are present, stop and repair that state before proceeding.
+    - Existing untracked root-level `.deb` artifacts and generated `safe/tests/` binaries are disposable build outputs. Verifiers must rebuild or overwrite them rather than trusting them as authoritative inputs.
+    - Preserve the Rust-only production build. No implementation phase may reintroduce compilation of `original/*.c` into `safe/build.rs`, `safe/Cargo.toml`, or `safe/src/`.
+    - Later phases must assume the crate already exports the current symbol surface and already passes the current local matrix. The workflow is verification-driven compatibility work, not a from-zero port bootstrap.
+    - `test-original.sh` must be updated in place rather than replaced with a second downstream harness, and the final workflow must add `--scope runtime|source|all` with default `all`, parse-before-Docker behavior, and the fixed shared-setup semantics described in phase 2.
+    - Later verifier phases must assert both positive and negative scope behavior: `--scope runtime` includes every runtime marker and excludes every source marker, `--scope source` includes every source marker and excludes every runtime-app marker, and `--scope all` includes both marker sets with one shared setup pass and runtime markers before source markers.
+    - Any downstream failure discovered in a runtime or source-build phase must leave behind a committed regression under `safe/tests/compat/` or a committed deterministic extension to `safe/tests/Makefile` before that phase yields.
+    - `safe/tests/compat/` must stay deterministic and repo-local. Do not vendor downstream source trees, duplicate oracle corpora out of `original/`, or rely on arbitrary file scanning. `safe/tests/Makefile` must own a deterministic `compat-regress` aggregator target.
+    - Any verifier that rebuilds Debian packages must assert that only `libgif7_*.deb`, `libgif-dev_*.deb`, `libgif7-dbgsym_*.ddeb`, `giflib_*.changes`, and `giflib_*.buildinfo` are emitted.
+    - Any phase that claims full local regression coverage must explicitly run `gif2rgb-regress`; `make test` alone is insufficient.
+    - The final generated workflow order is fixed: `impl_01_local_contract`, `check_01_local_matrix`, `check_01_local_review`, `impl_02_package_and_harness`, `check_02_package_surface`, `check_02_harness_review`, `impl_03_runtime_dependents`, `check_03_runtime_matrix`, `check_03_runtime_review`, `impl_04_source_dependents`, `check_04_source_matrix`, `check_04_source_review`, `impl_05_regression_catchall`, `check_05_regression_matrix`, `check_05_senior_review`, `check_05_final_full`.
+    
+    ## Verification Phases
+    ### `check_01_local_matrix`
+    - `Phase ID`: `check_01_local_matrix`
+    - `Type`: `check`
+    - `bounce_target`: `impl_01_local_contract`
+    - `Purpose`: software-tester verification of the current Rust-only library contract before expensive downstream work begins.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    cargo build --manifest-path safe/Cargo.toml --release
+    if rg -n 'cc::Build|legacy backend|gif_legacy|\.\./original/.*\.c' safe/build.rs safe/Cargo.toml safe/src; then
+      echo 'production build reintroduced original C sources' >&2
+      exit 1
+    fi
+    cmp -s safe/include/gif_lib.h original/gif_lib.h
+    cc -I"$PWD/safe/include" -I"$PWD/original" safe/tests/abi_layout.c -o /tmp/giflib-abi-layout
+    /tmp/giflib-abi-layout
+    objdump -T safe/target/release/libgif.so | awk '$4 != "*UND*" && $6 == "Base" { print $7 "@Base" }' | sort > /tmp/safe-symbols.txt
+    sed -n '3,$p' original/debian/libgif7.symbols | awk '{print $1}' | sort > /tmp/original-symbols.txt
+    diff -u /tmp/original-symbols.txt /tmp/safe-symbols.txt
+    test "$(objdump -T safe/target/release/libgif.so | awk '/ GifAsciiTable8x8$/{print $3, $6, $7}')" = "DO Base GifAsciiTable8x8"
+    header_only_dir="$(mktemp -d)"
+    make -C safe/tests ORIGINAL_INCLUDEDIR="$header_only_dir" ORIGINAL_TESTS_DIR="$PWD/original/tests" ORIGINAL_PIC_DIR="$PWD/original/pic" LIBGIF_INCLUDEDIR="$PWD/safe/include" LIBGIF_LIBDIR="$PWD/safe/target/release" safe-header-regress
+    make -C safe/tests ORIGINAL_INCLUDEDIR="$PWD/original" ORIGINAL_TESTS_DIR="$PWD/original/tests" ORIGINAL_PIC_DIR="$PWD/original/pic" LIBGIF_INCLUDEDIR="$PWD/safe/include" LIBGIF_LIBDIR="$PWD/safe/target/release" test gif2rgb-regress link-compat-regress internal-export-regress malformed-regress malformed-baseline-regress compat-regress
+    original_build_dir="$(mktemp -d)"
+    trap 'rm -rf "$original_build_dir"' EXIT
+    cp -a original/. "$original_build_dir"
+    make -C "$original_build_dir" libgif.so libgif.a
+    cc -std=gnu99 -Wall -Wextra -I"$original_build_dir" "$original_build_dir/tests/public_api_regress.c" "$original_build_dir/libgif.a" -o /tmp/public_api_regress.original
+    cc -std=gnu99 -Wall -Wextra -I"$PWD/original" original/tests/public_api_regress.c "$PWD/safe/target/release/libgif.a" -o /tmp/public_api_regress.safe
+    safe/tests/perf_compare.sh /tmp/public_api_regress.original /tmp/public_api_regress.safe | tee /tmp/perf.log
+    grep -E '^PERF workload=render-welcome2 .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=render-treescap-interlaced .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=highlevel-copy-fire .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=rgb-to-gif-gifgrid .* threshold=2\.00$' /tmp/perf.log
+    python3 - <<'PY'
+    import pathlib
+    import re
+    import sys
+    
+    violations = []
+    for path in sorted(pathlib.Path("safe/src").rglob("*.rs")):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for idx, line in enumerate(lines, 1):
+            if re.search(r"\bunsafe\b", line):
+                window = lines[max(0, idx - 4):idx - 1]
+                if not any("SAFETY:" in prev for prev in window):
+                    violations.append(f"{path}:{idx}")
+    
+    if violations:
+        print("unsafe without nearby SAFETY comment:", file=sys.stderr)
+        print("\n".join(violations), file=sys.stderr)
+        sys.exit(1)
+    PY
+    if find safe/tests \
+      \( -path 'safe/tests/malformed/*' -o -path 'safe/tests/compat/*' \) -prune -o \
+      \( -type f -o -type l \) \
+      \( -name 'public_api_regress.c' -o -name '*.summary' -o -name '*.ico' -o -name '*.dmp' -o -name '*.map' -o -name '*.rgb' -o -name '*.gif' \) \
+      -print | grep -q .; then
+      echo 'unexpected vendored original harness or oracle files under safe/tests outside malformed/ and compat/' >&2
+      exit 1
+    fi
+    ```
+    
+    ### `check_01_local_review`
+    - `Phase ID`: `check_01_local_review`
+    - `Type`: `check`
+    - `bounce_target`: `impl_01_local_contract`
+    - `Purpose`: senior-tester review of phase-1 changes, with emphasis on preserving the already passing local contract and avoiding unnecessary churn.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    git show --stat --name-only --format=fuller HEAD^..HEAD
+    rg -n 'catch_panic_or|catch_error_or|catch_gif_error_or|catch_gif_and_error_or' safe/src
+    rg -n 'SAFETY:' safe/src
+    rg -n '^compat-regress:' safe/tests/Makefile
+    find safe/tests/compat -maxdepth 2 -type f | LC_ALL=C sort
+    ```
+    - `Review Checks`:
+      - Confirm the phase did not edit `original/`, `dependents.json`, or `relevant_cves.json`.
+      - Confirm any new local reproducer consumes existing fixtures or generates its own temporary inputs instead of vendoring upstream corpora.
+      - Confirm any file committed under `safe/tests/compat/` is locally authored, minimal, and documented policy-wise rather than copied from `original/tests/`, `original/pic/`, or downstream source packages.
+      - Confirm `compat-regress` is deterministic and no-op-safe when there are no issue-specific tests yet.
+    
+    ## Success Criteria
+    - The local ABI, export, and regression baseline is locked without reintroducing C-source production linkage.
+    - `safe/tests/compat/` and `safe/tests/compat/README.md` exist, and `safe/tests/Makefile` owns a deterministic `compat-regress` target.
+    - `check_01_local_matrix` and `check_01_local_review` both pass.
+    
+    ## Git Commit Requirement
+    The implementer must commit work to git before yielding. The phase must end as exactly one non-merge commit whose subject starts with `impl_01_local_contract:`, and after that commit `git status --short --untracked-files=no` must be empty, `git diff --quiet --exit-code` must succeed, and `git diff --cached --quiet --exit-code` must succeed.
+- id: check_01_local_matrix
+  type: check
+  bounce_target: impl_01_local_contract
+  prompt: |
+    Reviewer Role: Software tester verifier for `check_01_local_matrix` in the GIFLIB compatibility workflow.
+    
+    You are reviewing the output of `impl_01_local_contract`. Do not implement new functionality or make repository changes unless a listed command requires harmless local build artifacts; your job is to inspect and verify.
+    
+    Work from the repository root. This prompt is self-contained. Consume the existing artifacts listed below in place; do not refetch, recollect, rediscover, or regenerate them from scratch.
+    
+    ## Phase Name
+    Local Contract Lock And Regression Gap Closure
+    
+    ## Check Phase ID
+    `check_01_local_matrix`
+    
+    ## Bounce Target
+    `impl_01_local_contract`
+    
+    ## Preexisting Inputs
+    - `safe/Cargo.toml`
+    - `safe/build.rs`
+    - `safe/src/`
+    - `safe/include/gif_lib.h`
+    - `safe/tests/Makefile`
+    - `safe/tests/abi_layout.c`
+    - `safe/tests/internal_exports_smoke.c`
+    - `safe/tests/malformed_observe.c`
+    - `safe/tests/capture_malformed_baseline.sh`
+    - `safe/tests/malformed/`
+    - `safe/tests/malformed/manifest.txt`
+    - `safe/tests/malformed/original-baseline.txt`
+    - `safe/tests/compat/`
+    - `safe/tests/compat/README.md`
+    - `dependents.json`
+    - `safe/tests/perf_compare.sh`
+    - `relevant_cves.json`
+    - `original/`
+    - `original/gif_lib.h`
+    - `original/gif_hash.h`
+    - `original/debian/libgif7.symbols`
+    - `original/tests/public_api_regress.c`
+    - `original/tests/`
+    - `original/pic/`
+    
+    ## Specific Things To Verify
+    - software-tester verification of the current Rust-only library contract before expensive downstream work begins.
+    - Run the commands in the check section below exactly as written from the repository root.
+    - Confirm the relevant phase success criteria listed below still hold.
+    
+    ### `check_01_local_matrix`
+    - `Phase ID`: `check_01_local_matrix`
+    - `Type`: `check`
+    - `bounce_target`: `impl_01_local_contract`
+    - `Purpose`: software-tester verification of the current Rust-only library contract before expensive downstream work begins.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    cargo build --manifest-path safe/Cargo.toml --release
+    if rg -n 'cc::Build|legacy backend|gif_legacy|\.\./original/.*\.c' safe/build.rs safe/Cargo.toml safe/src; then
+      echo 'production build reintroduced original C sources' >&2
+      exit 1
+    fi
+    cmp -s safe/include/gif_lib.h original/gif_lib.h
+    cc -I"$PWD/safe/include" -I"$PWD/original" safe/tests/abi_layout.c -o /tmp/giflib-abi-layout
+    /tmp/giflib-abi-layout
+    objdump -T safe/target/release/libgif.so | awk '$4 != "*UND*" && $6 == "Base" { print $7 "@Base" }' | sort > /tmp/safe-symbols.txt
+    sed -n '3,$p' original/debian/libgif7.symbols | awk '{print $1}' | sort > /tmp/original-symbols.txt
+    diff -u /tmp/original-symbols.txt /tmp/safe-symbols.txt
+    test "$(objdump -T safe/target/release/libgif.so | awk '/ GifAsciiTable8x8$/{print $3, $6, $7}')" = "DO Base GifAsciiTable8x8"
+    header_only_dir="$(mktemp -d)"
+    make -C safe/tests ORIGINAL_INCLUDEDIR="$header_only_dir" ORIGINAL_TESTS_DIR="$PWD/original/tests" ORIGINAL_PIC_DIR="$PWD/original/pic" LIBGIF_INCLUDEDIR="$PWD/safe/include" LIBGIF_LIBDIR="$PWD/safe/target/release" safe-header-regress
+    make -C safe/tests ORIGINAL_INCLUDEDIR="$PWD/original" ORIGINAL_TESTS_DIR="$PWD/original/tests" ORIGINAL_PIC_DIR="$PWD/original/pic" LIBGIF_INCLUDEDIR="$PWD/safe/include" LIBGIF_LIBDIR="$PWD/safe/target/release" test gif2rgb-regress link-compat-regress internal-export-regress malformed-regress malformed-baseline-regress compat-regress
+    original_build_dir="$(mktemp -d)"
+    trap 'rm -rf "$original_build_dir"' EXIT
+    cp -a original/. "$original_build_dir"
+    make -C "$original_build_dir" libgif.so libgif.a
+    cc -std=gnu99 -Wall -Wextra -I"$original_build_dir" "$original_build_dir/tests/public_api_regress.c" "$original_build_dir/libgif.a" -o /tmp/public_api_regress.original
+    cc -std=gnu99 -Wall -Wextra -I"$PWD/original" original/tests/public_api_regress.c "$PWD/safe/target/release/libgif.a" -o /tmp/public_api_regress.safe
+    safe/tests/perf_compare.sh /tmp/public_api_regress.original /tmp/public_api_regress.safe | tee /tmp/perf.log
+    grep -E '^PERF workload=render-welcome2 .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=render-treescap-interlaced .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=highlevel-copy-fire .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=rgb-to-gif-gifgrid .* threshold=2\.00$' /tmp/perf.log
+    python3 - <<'PY'
+    import pathlib
+    import re
+    import sys
+    
+    violations = []
+    for path in sorted(pathlib.Path("safe/src").rglob("*.rs")):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for idx, line in enumerate(lines, 1):
+            if re.search(r"\bunsafe\b", line):
+                window = lines[max(0, idx - 4):idx - 1]
+                if not any("SAFETY:" in prev for prev in window):
+                    violations.append(f"{path}:{idx}")
+    
+    if violations:
+        print("unsafe without nearby SAFETY comment:", file=sys.stderr)
+        print("\n".join(violations), file=sys.stderr)
+        sys.exit(1)
+    PY
+    if find safe/tests \
+      \( -path 'safe/tests/malformed/*' -o -path 'safe/tests/compat/*' \) -prune -o \
+      \( -type f -o -type l \) \
+      \( -name 'public_api_regress.c' -o -name '*.summary' -o -name '*.ico' -o -name '*.dmp' -o -name '*.map' -o -name '*.rgb' -o -name '*.gif' \) \
+      -print | grep -q .; then
+      echo 'unexpected vendored original harness or oracle files under safe/tests outside malformed/ and compat/' >&2
+      exit 1
+    fi
+    ```
+    
+    ## Success Criteria
+    - The local ABI, export, and regression baseline is locked without reintroducing C-source production linkage.
+    - `safe/tests/compat/` and `safe/tests/compat/README.md` exist, and `safe/tests/Makefile` owns a deterministic `compat-regress` target.
+    - `check_01_local_matrix` and `check_01_local_review` both pass.
+    
+    After your analysis, end with exactly one of:
+    
+    VERDICT: PASS
+    VERDICT: FAIL: <reason>
+- id: check_01_local_review
+  type: check
+  bounce_target: impl_01_local_contract
+  prompt: |
+    Reviewer Role: Senior reviewer for `check_01_local_review` in the GIFLIB compatibility workflow.
+    
+    You are reviewing the output of `impl_01_local_contract`. Do not implement new functionality or make repository changes unless a listed command requires harmless local build artifacts; your job is to inspect and verify.
+    
+    Work from the repository root. This prompt is self-contained. Consume the existing artifacts listed below in place; do not refetch, recollect, rediscover, or regenerate them from scratch.
+    
+    ## Phase Name
+    Local Contract Lock And Regression Gap Closure
+    
+    ## Check Phase ID
+    `check_01_local_review`
+    
+    ## Bounce Target
+    `impl_01_local_contract`
+    
+    ## Preexisting Inputs
+    - `safe/Cargo.toml`
+    - `safe/build.rs`
+    - `safe/src/`
+    - `safe/include/gif_lib.h`
+    - `safe/tests/Makefile`
+    - `safe/tests/abi_layout.c`
+    - `safe/tests/internal_exports_smoke.c`
+    - `safe/tests/malformed_observe.c`
+    - `safe/tests/capture_malformed_baseline.sh`
+    - `safe/tests/malformed/`
+    - `safe/tests/malformed/manifest.txt`
+    - `safe/tests/malformed/original-baseline.txt`
+    - `safe/tests/compat/`
+    - `safe/tests/compat/README.md`
+    - `dependents.json`
+    - `safe/tests/perf_compare.sh`
+    - `relevant_cves.json`
+    - `original/`
+    - `original/gif_lib.h`
+    - `original/gif_hash.h`
+    - `original/debian/libgif7.symbols`
+    - `original/tests/public_api_regress.c`
+    - `original/tests/`
+    - `original/pic/`
+    
+    ## Specific Things To Verify
+    - senior-tester review of phase-1 changes, with emphasis on preserving the already passing local contract and avoiding unnecessary churn.
+    - Run the commands in the check section below exactly as written from the repository root.
+    - Confirm the relevant phase success criteria listed below still hold.
+    - Confirm the phase did not edit `original/`, `dependents.json`, or `relevant_cves.json`.
+    - Confirm any new local reproducer consumes existing fixtures or generates its own temporary inputs instead of vendoring upstream corpora.
+    - Confirm any file committed under `safe/tests/compat/` is locally authored, minimal, and documented policy-wise rather than copied from `original/tests/`, `original/pic/`, or downstream source packages.
+    - Confirm `compat-regress` is deterministic and no-op-safe when there are no issue-specific tests yet.
+    
+    ### `check_01_local_review`
+    - `Phase ID`: `check_01_local_review`
+    - `Type`: `check`
+    - `bounce_target`: `impl_01_local_contract`
+    - `Purpose`: senior-tester review of phase-1 changes, with emphasis on preserving the already passing local contract and avoiding unnecessary churn.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    git show --stat --name-only --format=fuller HEAD^..HEAD
+    rg -n 'catch_panic_or|catch_error_or|catch_gif_error_or|catch_gif_and_error_or' safe/src
+    rg -n 'SAFETY:' safe/src
+    rg -n '^compat-regress:' safe/tests/Makefile
+    find safe/tests/compat -maxdepth 2 -type f | LC_ALL=C sort
+    ```
+    - `Review Checks`:
+      - Confirm the phase did not edit `original/`, `dependents.json`, or `relevant_cves.json`.
+      - Confirm any new local reproducer consumes existing fixtures or generates its own temporary inputs instead of vendoring upstream corpora.
+      - Confirm any file committed under `safe/tests/compat/` is locally authored, minimal, and documented policy-wise rather than copied from `original/tests/`, `original/pic/`, or downstream source packages.
+      - Confirm `compat-regress` is deterministic and no-op-safe when there are no issue-specific tests yet.
+    
+    ## Success Criteria
+    - The local ABI, export, and regression baseline is locked without reintroducing C-source production linkage.
+    - `safe/tests/compat/` and `safe/tests/compat/README.md` exist, and `safe/tests/Makefile` owns a deterministic `compat-regress` target.
+    - `check_01_local_matrix` and `check_01_local_review` both pass.
+    
+    After your analysis, end with exactly one of:
+    
+    VERDICT: PASS
+    VERDICT: FAIL: <reason>
+- id: impl_02_package_and_harness
+  type: implement
+  bounce_target: null
+  prompt: |
+    You are implementing phase `impl_02_package_and_harness` for the GIFLIB compatibility workflow in this repository.
+    
+    Work from the repository root. This prompt is self-contained. Consume or update the existing artifacts listed below in place; do not refetch, recollect, rediscover, or regenerate them from scratch. Reuse and update the committed repository artifacts that already exist instead of recreating them from zero. Commit all phase work to git before yielding.
+    
+    # Phase 2
+    
+    ## Phase Name
+    Package Surface Lock And Downstream Harness Scoping
+    
+    ## Implement Phase ID
+    `impl_02_package_and_harness`
+    
+    ## Preexisting Inputs
+    - `safe/Cargo.toml`
+    - `safe/build.rs`
+    - `safe/src/`
+    - `safe/tests/compat/`
+    - `safe/tests/compat/README.md`
+    - `safe/include/gif_lib.h`
+    - `safe/debian/control`
+    - `safe/debian/rules`
+    - `safe/debian/changelog`
+    - `safe/debian/libgif7.symbols`
+    - `safe/debian/libgif7.install`
+    - `safe/debian/libgif-dev.install`
+    - `safe/debian/pkgconfig/libgif7.pc.in`
+    - `safe/debian/source/format`
+    - `test-original.sh`
+    - `dependents.json`
+    - `original/debian/libgif7.symbols`
+    - `original/gif_lib.h`
+    - `original/tests/public_api_regress.c`
+    - `original/tests/alloc.summary`
+    - `original/tests/legacy.summary`
+    
+    ## New Outputs
+    - package surface locked to the original export and install contract
+    - retained local `+safelibs` package versioning on the library-only Debian package set
+    - `test-original.sh --scope runtime|source|all` with parse-before-Docker behavior
+    - shared package-build, install, and linkage assertions reused across downstream scopes
+    
+    ## File Changes
+    - update `safe/debian/changelog`
+    - update `safe/debian/control`
+    - update `safe/debian/libgif-dev.install`
+    - update `safe/debian/libgif7.install`
+    - update `safe/debian/libgif7.symbols`
+    - update `safe/debian/pkgconfig/libgif7.pc.in`
+    - update `safe/debian/rules`
+    - update `safe/debian/source/format` only if it drifted
+    - update `test-original.sh`
+    - update `safe/build.rs` only if package or install-path behavior requires it
+    
+    ## Implementation Details
+    - Keep the package names `libgif7` and `libgif-dev`, keep the package set library-only, and keep the local version suffix `+safelibs...`.
+    - Keep `safe/debian/libgif7.symbols` aligned to `original/debian/libgif7.symbols`.
+    - Preserve the existing `libgif.pc -> libgif7.pc` behavior or an equivalent regular-file implementation; do not use an absolute symlink.
+    - Update `test-original.sh` in place. Do not introduce a second downstream harness.
+    - Add `--scope runtime`, `--scope source`, and `--scope all`, with `all` as the default.
+    - Finish argument parsing before any `docker build` or `docker run` side effects. `--help`, missing `--scope` values, invalid `--scope` values, and unexpected positional arguments must all return before container work begins.
+    - The downstream scope contract is fixed:
+      - `runtime`: run the shared setup exactly once, consisting of `validate_dependents_inventory`, package build/install, sample discovery, and packaged-linkage assertions, then run only the runtime-dependent app checks.
+      - `source`: run that same shared setup exactly once, then run only the source-build dependent checks.
+      - `all`: run the shared setup exactly once, then run the full runtime subset followed by the full source subset in that order.
+    - Keep package build, package install, sample discovery, and packaged-linkage assertions shared across scopes so `runtime`, `source`, and `all` all validate the same packaged install surface exactly once per run.
+    - Preserve the existing `log_step` markers because later verifier phases grep for those exact runtime and source markers.
+    - Preserve the current library-only packaging surface and do not introduce a new `giflib-tools` package from `safe/`.
+    - Because this phase leaves files under `safe/debian/`, `safe/build.rs`, `safe/Cargo.toml`, and public install/layout behavior in scope, rerun the extracted-package assertions and compile `original/tests/public_api_regress.c` against the extracted `libgif-dev` package contents before yielding.
+    - Keep consuming `safe/`, `original/`, and `dependents.json` in place. Do not recollect inventory data and do not edit `dependents.json` unless the inventory itself is proven wrong.
+    - The existing 13-entry `dependents.json` inventory already satisfies the requirement to test roughly a dozen real consumers, so this phase must wire the harness to that fixed inventory instead of rediscovering or regenerating a new app list.
+    
+    ## Verification Phases
+    ### `check_02_package_surface`
+    - `Phase ID`: `check_02_package_surface`
+    - `Type`: `check`
+    - `bounce_target`: `impl_02_package_and_harness`
+    - `Purpose`: software-tester verification of Debian package contents, installed development surface, and package metadata.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    diff -u original/debian/libgif7.symbols safe/debian/libgif7.symbols
+    grep -x '3.0 (quilt)' safe/debian/source/format
+    rm -f libgif7_*.deb libgif-dev_*.deb libgif7-dbgsym_*.ddeb giflib_*.changes giflib_*.buildinfo
+    (cd safe && dpkg-buildpackage -us -uc -b)
+    if find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) ! -name 'libgif7_*.deb' ! -name 'libgif-dev_*.deb' ! -name 'libgif7-dbgsym_*.ddeb' | grep -q .; then
+      echo 'unexpected non-library Debian package artifact' >&2
+      find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) >&2
+      exit 1
+    fi
+    if find . -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) ! -name 'giflib_*.changes' ! -name 'giflib_*.buildinfo' | grep -q .; then
+      echo 'unexpected non-giflib build metadata artifact' >&2
+      find . -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) >&2
+      exit 1
+    fi
+    runtime_matches="$(find . -maxdepth 1 -type f -name 'libgif7_*.deb' | LC_ALL=C sort)"
+    dev_matches="$(find . -maxdepth 1 -type f -name 'libgif-dev_*.deb' | LC_ALL=C sort)"
+    dbgsym_matches="$(find . -maxdepth 1 -type f -name 'libgif7-dbgsym_*.ddeb' | LC_ALL=C sort)"
+    changes_matches="$(find . -maxdepth 1 -type f -name 'giflib_*.changes' | LC_ALL=C sort)"
+    buildinfo_matches="$(find . -maxdepth 1 -type f -name 'giflib_*.buildinfo' | LC_ALL=C sort)"
+    [[ "$(printf '%s\n' "$runtime_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$dev_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$dbgsym_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$changes_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$buildinfo_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
+    runtime_deb="$(printf '%s\n' "$runtime_matches" | head -n1)"
+    dev_deb="$(printf '%s\n' "$dev_matches" | head -n1)"
+    dbgsym_ddeb="$(printf '%s\n' "$dbgsym_matches" | head -n1)"
+    changes_file="$(printf '%s\n' "$changes_matches" | head -n1)"
+    buildinfo_file="$(printf '%s\n' "$buildinfo_matches" | head -n1)"
+    test -n "$runtime_deb"
+    test -n "$dev_deb"
+    test -n "$dbgsym_ddeb"
+    test -n "$changes_file"
+    test -n "$buildinfo_file"
+    test "$(dpkg-deb -f "$runtime_deb" Package)" = "libgif7"
+    test "$(dpkg-deb -f "$dev_deb" Package)" = "libgif-dev"
+    case "$(dpkg-deb -f "$runtime_deb" Version)" in
+      *+safelibs*) ;;
+      *) echo 'missing local safelibs version suffix' >&2; exit 1 ;;
+    esac
+    runtime_tmp="$(mktemp -d)"
+    dev_tmp="$(mktemp -d)"
+    dpkg-deb -x "$runtime_deb" "$runtime_tmp"
+    dpkg-deb -x "$dev_deb" "$dev_tmp"
+    runtime_real="$(find "$runtime_tmp/usr/lib/$multiarch" -maxdepth 1 -type f -name 'libgif.so.7.*' | LC_ALL=C sort | head -n1)"
+    test -n "$runtime_real"
+    readelf -d "$runtime_real" | grep -E 'SONAME.*libgif\.so\.7'
+    test -L "$runtime_tmp/usr/lib/$multiarch/libgif.so.7"
+    test -f "$dev_tmp/usr/include/gif_lib.h"
+    cmp -s "$dev_tmp/usr/include/gif_lib.h" original/gif_lib.h
+    test -f "$dev_tmp/usr/lib/$multiarch/libgif.a"
+    test -L "$dev_tmp/usr/lib/$multiarch/libgif.so"
+    pkgconfig_dir="$dev_tmp/usr/lib/$multiarch/pkgconfig"
+    test -f "$pkgconfig_dir/libgif7.pc"
+    libgif_pc="$pkgconfig_dir/libgif.pc"
+    if [ -L "$libgif_pc" ]; then
+      test "$(readlink "$libgif_pc")" = "libgif7.pc"
+    else
+      test -f "$libgif_pc"
+    fi
+    env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif7
+    env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif
+    test "$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=libdir libgif7)" = "/usr/lib/$multiarch"
+    test "$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=includedir libgif7)" = "/usr/include"
+    if find "$runtime_tmp" "$dev_tmp" \( -type f -o -type l \) \( -name 'gif_hash.h' -o -name 'gif_lib_private.h' \) | grep -q .; then
+      echo 'unexpected private header installed in packages' >&2
+      exit 1
+    fi
+    cc -std=gnu99 -Wall -Wextra -I"$dev_tmp/usr/include" original/tests/public_api_regress.c "$dev_tmp/usr/lib/$multiarch/libgif.a" -o /tmp/public_api_regress.pkg
+    /tmp/public_api_regress.pkg legacy | diff -u original/tests/legacy.summary -
+    /tmp/public_api_regress.pkg alloc | diff -u original/tests/alloc.summary -
+    ```
+    
+    ### `check_02_harness_review`
+    - `Phase ID`: `check_02_harness_review`
+    - `Type`: `check`
+    - `bounce_target`: `impl_02_package_and_harness`
+    - `Purpose`: senior-tester review of `test-original.sh` changes needed for scoped downstream execution.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    git show --stat --name-only --format=fuller HEAD^..HEAD
+    bash -n test-original.sh
+    stub_dir="$(mktemp -d)"
+    cat > "$stub_dir/docker" <<'SH'
+    #!/bin/sh
+    echo 'docker should not run for parse-only paths' >&2
+    exit 97
+    SH
+    chmod +x "$stub_dir/docker"
+    PATH="$stub_dir:$PATH" bash test-original.sh --help > /tmp/test-original-help.txt
+    grep -E -- '--scope( |=)(runtime|source|all)|runtime\|source\|all' /tmp/test-original-help.txt
+    if PATH="$stub_dir:$PATH" bash test-original.sh --scope bogus >/tmp/test-original-invalid.log 2>&1; then
+      echo 'invalid scope unexpectedly succeeded' >&2
+      exit 1
+    fi
+    grep -Ei 'invalid scope|usage' /tmp/test-original-invalid.log
+    if grep -F 'docker should not run for parse-only paths' /tmp/test-original-invalid.log; then
+      echo 'invalid scope path invoked docker before rejecting arguments' >&2
+      exit 1
+    fi
+    if PATH="$stub_dir:$PATH" bash test-original.sh --scope >/tmp/test-original-missing.log 2>&1; then
+      echo 'missing scope argument unexpectedly succeeded' >&2
+      exit 1
+    fi
+    grep -Ei 'missing.*scope|usage' /tmp/test-original-missing.log
+    if grep -F 'docker should not run for parse-only paths' /tmp/test-original-missing.log; then
+      echo 'missing scope path invoked docker before rejecting arguments' >&2
+      exit 1
+    fi
+    if PATH="$stub_dir:$PATH" bash test-original.sh unexpected >/tmp/test-original-extra-arg.log 2>&1; then
+      echo 'unexpected positional argument unexpectedly succeeded' >&2
+      exit 1
+    fi
+    grep -Ei 'unexpected argument|usage' /tmp/test-original-extra-arg.log
+    if grep -F 'docker should not run for parse-only paths' /tmp/test-original-extra-arg.log; then
+      echo 'unexpected-argument path invoked docker before rejecting arguments' >&2
+      exit 1
+    fi
+    rg -n 'GIFLIB_TEST_SCOPE|--scope' test-original.sh
+    rg -n 'scope=.*all|GIFLIB_TEST_SCOPE=.*all' test-original.sh
+    rg -n '^usage\(\)|^parse_args\(\)|^build_safe_packages\(\)|^install_safe_packages\(\)|^resolve_installed_shared_libgif\(\)|^resolve_installed_static_libgif\(\)|^assert_links_to_active_shared_libgif\(\)|^assert_build_uses_active_giflib\(\)' test-original.sh
+    if rg -n '/usr/local|build_original_giflib|assert_uses_original' test-original.sh; then
+      echo 'stale original-install logic remains' >&2
+      exit 1
+    fi
+    ```
+    - `Review Checks`:
+      - Confirm the script still builds and installs the exact local safe `.deb`s before any downstream checks.
+      - Confirm `--help`, missing-argument, invalid-scope, and unexpected-argument paths all return before any `docker build` or `docker run`.
+      - Confirm runtime and source subsets are gated separately, the default remains `all`, and `--scope all` still runs runtime markers before source markers after one shared setup pass.
+      - Confirm the script still consumes `dependents.json`, `safe/`, and `original/` in place instead of duplicating them.
+    
+    ## Success Criteria
+    - Files under `safe/debian/` stay aligned to the upstream contract while preserving the local safelibs package versioning and the library-only package set.
+    - `test-original.sh` exposes `--scope runtime|source|all`, defaults to `all`, and rejects parse-only errors before any Docker side effects.
+    - `check_02_package_surface` and `check_02_harness_review` both pass.
+    
+    ## Git Commit Requirement
+    The implementer must commit work to git before yielding. The phase must end as exactly one non-merge commit whose subject starts with `impl_02_package_and_harness:`, and after that commit `git status --short --untracked-files=no` must be empty, `git diff --quiet --exit-code` must succeed, and `git diff --cached --quiet --exit-code` must succeed.
+- id: check_02_package_surface
+  type: check
+  bounce_target: impl_02_package_and_harness
+  prompt: |
+    Reviewer Role: Software tester verifier for `check_02_package_surface` in the GIFLIB compatibility workflow.
+    
+    You are reviewing the output of `impl_02_package_and_harness`. Do not implement new functionality or make repository changes unless a listed command requires harmless local build artifacts; your job is to inspect and verify.
+    
+    Work from the repository root. This prompt is self-contained. Consume the existing artifacts listed below in place; do not refetch, recollect, rediscover, or regenerate them from scratch.
+    
+    ## Phase Name
+    Package Surface Lock And Downstream Harness Scoping
+    
+    ## Check Phase ID
+    `check_02_package_surface`
+    
+    ## Bounce Target
+    `impl_02_package_and_harness`
+    
+    ## Preexisting Inputs
+    - `safe/Cargo.toml`
+    - `safe/build.rs`
+    - `safe/src/`
+    - `safe/include/gif_lib.h`
+    - `safe/debian/control`
+    - `safe/debian/rules`
+    - `safe/debian/changelog`
+    - `safe/debian/libgif7.symbols`
+    - `safe/debian/libgif7.install`
+    - `safe/debian/libgif-dev.install`
+    - `safe/debian/pkgconfig/libgif7.pc.in`
+    - `safe/debian/source/format`
+    - `test-original.sh`
+    - `dependents.json`
+    - `original/debian/libgif7.symbols`
+    - `original/gif_lib.h`
+    - `original/tests/public_api_regress.c`
+    - `original/tests/alloc.summary`
+    - `original/tests/legacy.summary`
+    
+    ## Specific Things To Verify
+    - software-tester verification of Debian package contents, installed development surface, and package metadata.
+    - Run the commands in the check section below exactly as written from the repository root.
+    - Confirm the relevant phase success criteria listed below still hold.
+    
+    ### `check_02_package_surface`
+    - `Phase ID`: `check_02_package_surface`
+    - `Type`: `check`
+    - `bounce_target`: `impl_02_package_and_harness`
+    - `Purpose`: software-tester verification of Debian package contents, installed development surface, and package metadata.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    diff -u original/debian/libgif7.symbols safe/debian/libgif7.symbols
+    grep -x '3.0 (quilt)' safe/debian/source/format
+    rm -f libgif7_*.deb libgif-dev_*.deb libgif7-dbgsym_*.ddeb giflib_*.changes giflib_*.buildinfo
+    (cd safe && dpkg-buildpackage -us -uc -b)
+    if find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) ! -name 'libgif7_*.deb' ! -name 'libgif-dev_*.deb' ! -name 'libgif7-dbgsym_*.ddeb' | grep -q .; then
+      echo 'unexpected non-library Debian package artifact' >&2
+      find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) >&2
+      exit 1
+    fi
+    if find . -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) ! -name 'giflib_*.changes' ! -name 'giflib_*.buildinfo' | grep -q .; then
+      echo 'unexpected non-giflib build metadata artifact' >&2
+      find . -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) >&2
+      exit 1
+    fi
+    runtime_matches="$(find . -maxdepth 1 -type f -name 'libgif7_*.deb' | LC_ALL=C sort)"
+    dev_matches="$(find . -maxdepth 1 -type f -name 'libgif-dev_*.deb' | LC_ALL=C sort)"
+    dbgsym_matches="$(find . -maxdepth 1 -type f -name 'libgif7-dbgsym_*.ddeb' | LC_ALL=C sort)"
+    changes_matches="$(find . -maxdepth 1 -type f -name 'giflib_*.changes' | LC_ALL=C sort)"
+    buildinfo_matches="$(find . -maxdepth 1 -type f -name 'giflib_*.buildinfo' | LC_ALL=C sort)"
+    [[ "$(printf '%s\n' "$runtime_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$dev_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$dbgsym_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$changes_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$buildinfo_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
+    runtime_deb="$(printf '%s\n' "$runtime_matches" | head -n1)"
+    dev_deb="$(printf '%s\n' "$dev_matches" | head -n1)"
+    dbgsym_ddeb="$(printf '%s\n' "$dbgsym_matches" | head -n1)"
+    changes_file="$(printf '%s\n' "$changes_matches" | head -n1)"
+    buildinfo_file="$(printf '%s\n' "$buildinfo_matches" | head -n1)"
+    test -n "$runtime_deb"
+    test -n "$dev_deb"
+    test -n "$dbgsym_ddeb"
+    test -n "$changes_file"
+    test -n "$buildinfo_file"
+    test "$(dpkg-deb -f "$runtime_deb" Package)" = "libgif7"
+    test "$(dpkg-deb -f "$dev_deb" Package)" = "libgif-dev"
+    case "$(dpkg-deb -f "$runtime_deb" Version)" in
+      *+safelibs*) ;;
+      *) echo 'missing local safelibs version suffix' >&2; exit 1 ;;
+    esac
+    runtime_tmp="$(mktemp -d)"
+    dev_tmp="$(mktemp -d)"
+    dpkg-deb -x "$runtime_deb" "$runtime_tmp"
+    dpkg-deb -x "$dev_deb" "$dev_tmp"
+    runtime_real="$(find "$runtime_tmp/usr/lib/$multiarch" -maxdepth 1 -type f -name 'libgif.so.7.*' | LC_ALL=C sort | head -n1)"
+    test -n "$runtime_real"
+    readelf -d "$runtime_real" | grep -E 'SONAME.*libgif\.so\.7'
+    test -L "$runtime_tmp/usr/lib/$multiarch/libgif.so.7"
+    test -f "$dev_tmp/usr/include/gif_lib.h"
+    cmp -s "$dev_tmp/usr/include/gif_lib.h" original/gif_lib.h
+    test -f "$dev_tmp/usr/lib/$multiarch/libgif.a"
+    test -L "$dev_tmp/usr/lib/$multiarch/libgif.so"
+    pkgconfig_dir="$dev_tmp/usr/lib/$multiarch/pkgconfig"
+    test -f "$pkgconfig_dir/libgif7.pc"
+    libgif_pc="$pkgconfig_dir/libgif.pc"
+    if [ -L "$libgif_pc" ]; then
+      test "$(readlink "$libgif_pc")" = "libgif7.pc"
+    else
+      test -f "$libgif_pc"
+    fi
+    env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif7
+    env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif
+    test "$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=libdir libgif7)" = "/usr/lib/$multiarch"
+    test "$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=includedir libgif7)" = "/usr/include"
+    if find "$runtime_tmp" "$dev_tmp" \( -type f -o -type l \) \( -name 'gif_hash.h' -o -name 'gif_lib_private.h' \) | grep -q .; then
+      echo 'unexpected private header installed in packages' >&2
+      exit 1
+    fi
+    cc -std=gnu99 -Wall -Wextra -I"$dev_tmp/usr/include" original/tests/public_api_regress.c "$dev_tmp/usr/lib/$multiarch/libgif.a" -o /tmp/public_api_regress.pkg
+    /tmp/public_api_regress.pkg legacy | diff -u original/tests/legacy.summary -
+    /tmp/public_api_regress.pkg alloc | diff -u original/tests/alloc.summary -
+    ```
+    
+    ## Success Criteria
+    - Files under `safe/debian/` stay aligned to the upstream contract while preserving the local safelibs package versioning and the library-only package set.
+    - `test-original.sh` exposes `--scope runtime|source|all`, defaults to `all`, and rejects parse-only errors before any Docker side effects.
+    - `check_02_package_surface` and `check_02_harness_review` both pass.
+    
+    After your analysis, end with exactly one of:
+    
+    VERDICT: PASS
+    VERDICT: FAIL: <reason>
+- id: check_02_harness_review
+  type: check
+  bounce_target: impl_02_package_and_harness
+  prompt: |
+    Reviewer Role: Senior reviewer for `check_02_harness_review` in the GIFLIB compatibility workflow.
+    
+    You are reviewing the output of `impl_02_package_and_harness`. Do not implement new functionality or make repository changes unless a listed command requires harmless local build artifacts; your job is to inspect and verify.
+    
+    Work from the repository root. This prompt is self-contained. Consume the existing artifacts listed below in place; do not refetch, recollect, rediscover, or regenerate them from scratch.
+    
+    ## Phase Name
+    Package Surface Lock And Downstream Harness Scoping
+    
+    ## Check Phase ID
+    `check_02_harness_review`
+    
+    ## Bounce Target
+    `impl_02_package_and_harness`
+    
+    ## Preexisting Inputs
+    - `safe/Cargo.toml`
+    - `safe/build.rs`
+    - `safe/src/`
+    - `safe/include/gif_lib.h`
+    - `safe/debian/control`
+    - `safe/debian/rules`
+    - `safe/debian/changelog`
+    - `safe/debian/libgif7.symbols`
+    - `safe/debian/libgif7.install`
+    - `safe/debian/libgif-dev.install`
+    - `safe/debian/pkgconfig/libgif7.pc.in`
+    - `safe/debian/source/format`
+    - `test-original.sh`
+    - `dependents.json`
+    - `original/debian/libgif7.symbols`
+    - `original/gif_lib.h`
+    - `original/tests/public_api_regress.c`
+    - `original/tests/alloc.summary`
+    - `original/tests/legacy.summary`
+    
+    ## Specific Things To Verify
+    - senior-tester review of `test-original.sh` changes needed for scoped downstream execution.
+    - Run the commands in the check section below exactly as written from the repository root.
+    - Confirm the relevant phase success criteria listed below still hold.
+    - Confirm the script still builds and installs the exact local safe `.deb`s before any downstream checks.
+    - Confirm `--help`, missing-argument, invalid-scope, and unexpected-argument paths all return before any `docker build` or `docker run`.
+    - Confirm runtime and source subsets are gated separately, the default remains `all`, and `--scope all` still runs runtime markers before source markers after one shared setup pass.
+    - Confirm the script still consumes `dependents.json`, `safe/`, and `original/` in place instead of duplicating them.
+    
+    ### `check_02_harness_review`
+    - `Phase ID`: `check_02_harness_review`
+    - `Type`: `check`
+    - `bounce_target`: `impl_02_package_and_harness`
+    - `Purpose`: senior-tester review of `test-original.sh` changes needed for scoped downstream execution.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    git show --stat --name-only --format=fuller HEAD^..HEAD
+    bash -n test-original.sh
+    stub_dir="$(mktemp -d)"
+    cat > "$stub_dir/docker" <<'SH'
+    #!/bin/sh
+    echo 'docker should not run for parse-only paths' >&2
+    exit 97
+    SH
+    chmod +x "$stub_dir/docker"
+    PATH="$stub_dir:$PATH" bash test-original.sh --help > /tmp/test-original-help.txt
+    grep -E -- '--scope( |=)(runtime|source|all)|runtime\|source\|all' /tmp/test-original-help.txt
+    if PATH="$stub_dir:$PATH" bash test-original.sh --scope bogus >/tmp/test-original-invalid.log 2>&1; then
+      echo 'invalid scope unexpectedly succeeded' >&2
+      exit 1
+    fi
+    grep -Ei 'invalid scope|usage' /tmp/test-original-invalid.log
+    if grep -F 'docker should not run for parse-only paths' /tmp/test-original-invalid.log; then
+      echo 'invalid scope path invoked docker before rejecting arguments' >&2
+      exit 1
+    fi
+    if PATH="$stub_dir:$PATH" bash test-original.sh --scope >/tmp/test-original-missing.log 2>&1; then
+      echo 'missing scope argument unexpectedly succeeded' >&2
+      exit 1
+    fi
+    grep -Ei 'missing.*scope|usage' /tmp/test-original-missing.log
+    if grep -F 'docker should not run for parse-only paths' /tmp/test-original-missing.log; then
+      echo 'missing scope path invoked docker before rejecting arguments' >&2
+      exit 1
+    fi
+    if PATH="$stub_dir:$PATH" bash test-original.sh unexpected >/tmp/test-original-extra-arg.log 2>&1; then
+      echo 'unexpected positional argument unexpectedly succeeded' >&2
+      exit 1
+    fi
+    grep -Ei 'unexpected argument|usage' /tmp/test-original-extra-arg.log
+    if grep -F 'docker should not run for parse-only paths' /tmp/test-original-extra-arg.log; then
+      echo 'unexpected-argument path invoked docker before rejecting arguments' >&2
+      exit 1
+    fi
+    rg -n 'GIFLIB_TEST_SCOPE|--scope' test-original.sh
+    rg -n 'scope=.*all|GIFLIB_TEST_SCOPE=.*all' test-original.sh
+    rg -n '^usage\(\)|^parse_args\(\)|^build_safe_packages\(\)|^install_safe_packages\(\)|^resolve_installed_shared_libgif\(\)|^resolve_installed_static_libgif\(\)|^assert_links_to_active_shared_libgif\(\)|^assert_build_uses_active_giflib\(\)' test-original.sh
+    if rg -n '/usr/local|build_original_giflib|assert_uses_original' test-original.sh; then
+      echo 'stale original-install logic remains' >&2
+      exit 1
+    fi
+    ```
+    - `Review Checks`:
+      - Confirm the script still builds and installs the exact local safe `.deb`s before any downstream checks.
+      - Confirm `--help`, missing-argument, invalid-scope, and unexpected-argument paths all return before any `docker build` or `docker run`.
+      - Confirm runtime and source subsets are gated separately, the default remains `all`, and `--scope all` still runs runtime markers before source markers after one shared setup pass.
+      - Confirm the script still consumes `dependents.json`, `safe/`, and `original/` in place instead of duplicating them.
+    
+    ## Success Criteria
+    - Files under `safe/debian/` stay aligned to the upstream contract while preserving the local safelibs package versioning and the library-only package set.
+    - `test-original.sh` exposes `--scope runtime|source|all`, defaults to `all`, and rejects parse-only errors before any Docker side effects.
+    - `check_02_package_surface` and `check_02_harness_review` both pass.
+    
+    After your analysis, end with exactly one of:
+    
+    VERDICT: PASS
+    VERDICT: FAIL: <reason>
+- id: impl_03_runtime_dependents
+  type: implement
+  bounce_target: null
+  prompt: |
+    You are implementing phase `impl_03_runtime_dependents` for the GIFLIB compatibility workflow in this repository.
+    
+    Work from the repository root. This prompt is self-contained. Consume or update the existing artifacts listed below in place; do not refetch, recollect, rediscover, or regenerate them from scratch. Reuse and update the committed repository artifacts that already exist instead of recreating them from zero. Commit all phase work to git before yielding.
+    
+    # Phase 3
+    
+    ## Phase Name
+    Runtime Dependent Matrix Fixes
+    
+    ## Implement Phase ID
+    `impl_03_runtime_dependents`
+    
+    ## Preexisting Inputs
+    - `safe/Cargo.toml`
+    - `safe/build.rs`
+    - `safe/src/`
+    - `safe/include/gif_lib.h`
+    - `safe/debian/control`
+    - `safe/debian/rules`
+    - `safe/debian/changelog`
+    - `safe/debian/libgif7.symbols`
+    - `safe/debian/libgif7.install`
+    - `safe/debian/libgif-dev.install`
+    - `safe/debian/pkgconfig/libgif7.pc.in`
+    - `safe/debian/source/format`
+    - `safe/tests/Makefile`
+    - `safe/tests/internal_exports_smoke.c`
+    - `safe/tests/malformed_observe.c`
+    - `safe/tests/capture_malformed_baseline.sh`
+    - `safe/tests/malformed/`
+    - `safe/tests/malformed/manifest.txt`
+    - `safe/tests/malformed/original-baseline.txt`
+    - `safe/tests/compat/`
+    - `safe/tests/compat/README.md`
+    - `safe/tests/perf_compare.sh`
+    - `relevant_cves.json`
+    - `test-original.sh`
+    - `dependents.json`
+    - `original/`
+    - `original/gif_lib.h`
+    - `original/gif_hash.h`
+    - `original/tests/public_api_regress.c`
+    - `original/tests/`
+    - `original/pic/`
+    
+    ## New Outputs
+    - fixes for runtime-dependent compatibility failures
+    - issue-specific runtime reproducers under `safe/tests/compat/`
+    - corresponding `compat-regress` registrations
+    
+    ## File Changes
+    - update `safe/src/decode.rs`
+    - update `safe/src/slurp.rs`
+    - update `safe/src/helpers.rs`
+    - update `safe/src/io.rs`
+    - update `safe/src/state.rs`
+    - update `safe/src/gcb.rs`
+    - update `safe/src/draw.rs`
+    - update `safe/src/error.rs`
+    - update `safe/tests/Makefile`
+    - create or update issue-specific reproducers under `safe/tests/compat/`
+    - update `test-original.sh` only if the runtime probe itself needs stabilization
+    
+    ## Implementation Details
+    - Focus on runtime behavior exercised by the installed library, not on recollecting package metadata or downstream inventories.
+    - Treat these downstream apps as the concrete runtime behavior gate:
+      - `giflib-tools`: text dump behavior and the general decode path exercised by the installed tools.
+      - `webp` or `gif2webp`: valid GIF decode behavior and animation ingestion.
+      - `fbi`: native GIF handling versus `convert` fallback behavior.
+      - `mtpaint`: valid-versus-invalid GIF UI behavior.
+      - `tracker-extract`: metadata extraction and dimension reporting.
+      - `libextractor-plugin-gif`: metadata extraction behavior.
+      - `libcamlimages-ocaml`: successful image load behavior and dimension reporting.
+      - `libgdal34t64`: runtime GIF driver behavior.
+    - Before yielding, add a permanent local regression for every runtime bug found. Prefer a minimal C or shell reproducer under `safe/tests/compat/` over relying on Docker-only evidence.
+    - Keep consuming the scoped downstream harness and existing oracle corpora in place: use `test-original.sh`, `dependents.json`, `original/tests/`, and `original/pic/` instead of copying downstream packages or oracle data into the repo.
+    - Keep consuming `relevant_cves.json` and `safe/tests/malformed/` in place rather than rediscovering or regenerating malformed-input scope.
+    - Do not vendor downstream source-package contents into `safe/tests/compat/`.
+    - Preserve the runtime-scope gate itself while fixing bugs: `--scope runtime` must include every runtime marker, exclude every source-build marker, and run the shared setup exactly once.
+    - If a runtime fix touches decoder or slurp behavior, keep malformed-baseline coverage and decode-heavy local regressions green.
+    - If this phase edits decoder/slurp/data-path files such as `safe/src/decode.rs`, `safe/src/slurp.rs`, `safe/src/io.rs`, `safe/src/state.rs`, or `safe/src/helpers.rs`, rerun `render-regress`, `gifclrmp-regress`, `giffilter-regress`, `giftext-regress`, `malformed-regress`, and `malformed-baseline-regress` before yielding.
+    - If this phase edits encoder/write/quantize/drawing files such as `safe/src/encode.rs`, `safe/src/gcb.rs`, `safe/src/helpers.rs`, `safe/src/quantize.rs`, or `safe/src/draw.rs`, rerun `gifbuild-regress`, `gifsponge-regress`, `giftool-regress`, `giffix-regress`, `gif2rgb-regress`, `gifecho-regress`, `drawing-regress`, and `gifwedge-regress` before yielding.
+    - If a runtime fix touches hot-path code, keep `safe/tests/perf_compare.sh` passing.
+    - If this phase edits hot-path files `safe/src/decode.rs`, `safe/src/encode.rs`, `safe/src/quantize.rs`, `safe/src/helpers.rs`, `safe/src/state.rs`, or `safe/src/io.rs`, rerun `safe/tests/perf_compare.sh` before yielding.
+    - Preserve panic fencing and `SAFETY:` commentary at C ABI boundaries while landing runtime fixes.
+    - If this phase edits FFI entry points or raw-pointer-heavy code, rerun the `SAFETY:` audit and keep panic fencing at the C ABI boundary before yielding.
+    
+    ## Verification Phases
+    ### `check_03_runtime_matrix`
+    - `Phase ID`: `check_03_runtime_matrix`
+    - `Type`: `check`
+    - `bounce_target`: `impl_03_runtime_dependents`
+    - `Purpose`: software-tester execution of the runtime-dependent Docker subset plus the relevant local regression matrix.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    cargo build --manifest-path safe/Cargo.toml --release
+    make -C safe/tests ORIGINAL_INCLUDEDIR="$PWD/original" ORIGINAL_TESTS_DIR="$PWD/original/tests" ORIGINAL_PIC_DIR="$PWD/original/pic" LIBGIF_INCLUDEDIR="$PWD/safe/include" LIBGIF_LIBDIR="$PWD/safe/target/release" test gif2rgb-regress link-compat-regress internal-export-regress malformed-regress malformed-baseline-regress compat-regress
+    original_build_dir="$(mktemp -d)"
+    trap 'rm -rf "$original_build_dir"' EXIT
+    cp -a original/. "$original_build_dir"
+    make -C "$original_build_dir" libgif.so libgif.a
+    cc -std=gnu99 -Wall -Wextra -I"$original_build_dir" "$original_build_dir/tests/public_api_regress.c" "$original_build_dir/libgif.a" -o /tmp/public_api_regress.original
+    cc -std=gnu99 -Wall -Wextra -I"$PWD/original" original/tests/public_api_regress.c "$PWD/safe/target/release/libgif.a" -o /tmp/public_api_regress.safe
+    safe/tests/perf_compare.sh /tmp/public_api_regress.original /tmp/public_api_regress.safe | tee /tmp/perf-runtime.log
+    grep -E '^PERF workload=render-welcome2 .* threshold=2\.00$' /tmp/perf-runtime.log
+    grep -E '^PERF workload=render-treescap-interlaced .* threshold=2\.00$' /tmp/perf-runtime.log
+    grep -E '^PERF workload=highlevel-copy-fire .* threshold=2\.00$' /tmp/perf-runtime.log
+    grep -E '^PERF workload=rgb-to-gif-gifgrid .* threshold=2\.00$' /tmp/perf-runtime.log
+    python3 - <<'PY'
+    import pathlib
+    import re
+    import sys
+    
+    violations = []
+    for path in sorted(pathlib.Path("safe/src").rglob("*.rs")):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for idx, line in enumerate(lines, 1):
+            if re.search(r"\bunsafe\b", line):
+                window = lines[max(0, idx - 4):idx - 1]
+                if not any("SAFETY:" in prev for prev in window):
+                    violations.append(f"{path}:{idx}")
+    
+    if violations:
+        print("unsafe without nearby SAFETY comment:", file=sys.stderr)
+        print("\n".join(violations), file=sys.stderr)
+        sys.exit(1)
+    PY
+    bash -o pipefail -c './test-original.sh --scope runtime | tee /tmp/test-runtime.log'
+    python3 - <<'PY'
+    from pathlib import Path
+    import sys
+    
+    log = Path('/tmp/test-runtime.log').read_text(encoding='utf-8')
+    required = [
+        '==> Building safe Debian packages',
+        '==> Installing safe Debian packages',
+        '==> Verifying runtime linkage to active packaged giflib',
+        '==> giflib-tools',
+        '==> webp',
+        '==> fbi',
+        '==> mtpaint',
+        '==> tracker-extract',
+        '==> libextractor-plugin-gif',
+        '==> libcamlimages-ocaml',
+        '==> libgdal34t64',
+        'All downstream checks passed',
+    ]
+    forbidden = [
+        '==> gdal (source)',
+        '==> exactimage (source)',
+        '==> sail (source)',
+        '==> libwebp (source)',
+        '==> imlib2 (source)',
+    ]
+    
+    missing = [marker for marker in required if marker not in log]
+    unexpected = [marker for marker in forbidden if marker in log]
+    count_errors = [
+        marker for marker in required[:3]
+        if log.count(marker) != 1
+    ]
+    
+    if missing or unexpected or count_errors:
+        if missing:
+            print('missing runtime-scope markers:', *missing, sep='\n', file=sys.stderr)
+        if unexpected:
+            print('unexpected source-scope markers during runtime scope:', *unexpected, sep='\n', file=sys.stderr)
+        if count_errors:
+            print('shared setup markers must appear exactly once during runtime scope:', *count_errors, sep='\n', file=sys.stderr)
+        sys.exit(1)
+    PY
+    ```
+    
+    ### `check_03_runtime_review`
+    - `Phase ID`: `check_03_runtime_review`
+    - `Type`: `check`
+    - `bounce_target`: `impl_03_runtime_dependents`
+    - `Purpose`: senior-tester review of runtime-dependent fixes and their regression coverage.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    git show --stat --name-only --format=fuller HEAD^..HEAD
+    find safe/tests/compat -maxdepth 2 -type f | LC_ALL=C sort
+    rg -n 'runtime|giftext|gif2webp|fbi|mtpaint|tracker|extractor|camlimages|gdal' safe/tests/compat safe/tests/Makefile test-original.sh
+    rg -n 'SAFETY:' safe/src
+    rg -n 'catch_panic_or|catch_error_or|catch_gif_error_or|catch_gif_and_error_or' safe/src
+    ```
+    - `Review Checks`:
+      - Every runtime-only bug found in Docker must have a permanent local reproducer under `safe/tests/compat/` or an explicit extension in `safe/tests/Makefile`.
+      - Do not vendor any downstream source package contents into the repository.
+      - Keep fixes minimal to the failing runtime behavior; avoid unrelated package or source-build churn unless required by the bug.
+    
+    ## Success Criteria
+    - Every runtime-only downstream failure is fixed with a committed local reproducer or deterministic local regression target.
+    - `--scope runtime` runs the shared setup once, covers every runtime marker, and excludes every source-build marker.
+    - `check_03_runtime_matrix` and `check_03_runtime_review` both pass.
+    
+    ## Git Commit Requirement
+    The implementer must commit work to git before yielding. The phase must end as exactly one non-merge commit whose subject starts with `impl_03_runtime_dependents:`, and after that commit `git status --short --untracked-files=no` must be empty, `git diff --quiet --exit-code` must succeed, and `git diff --cached --quiet --exit-code` must succeed.
+- id: check_03_runtime_matrix
+  type: check
+  bounce_target: impl_03_runtime_dependents
+  prompt: |
+    Reviewer Role: Software tester verifier for `check_03_runtime_matrix` in the GIFLIB compatibility workflow.
+    
+    You are reviewing the output of `impl_03_runtime_dependents`. Do not implement new functionality or make repository changes unless a listed command requires harmless local build artifacts; your job is to inspect and verify.
+    
+    Work from the repository root. This prompt is self-contained. Consume the existing artifacts listed below in place; do not refetch, recollect, rediscover, or regenerate them from scratch.
+    
+    ## Phase Name
+    Runtime Dependent Matrix Fixes
+    
+    ## Check Phase ID
+    `check_03_runtime_matrix`
+    
+    ## Bounce Target
+    `impl_03_runtime_dependents`
+    
+    ## Preexisting Inputs
+    - `safe/Cargo.toml`
+    - `safe/build.rs`
+    - `safe/src/`
+    - `safe/include/gif_lib.h`
+    - `safe/debian/control`
+    - `safe/debian/rules`
+    - `safe/debian/changelog`
+    - `safe/debian/libgif7.symbols`
+    - `safe/debian/libgif7.install`
+    - `safe/debian/libgif-dev.install`
+    - `safe/debian/pkgconfig/libgif7.pc.in`
+    - `safe/debian/source/format`
+    - `safe/tests/Makefile`
+    - `safe/tests/internal_exports_smoke.c`
+    - `safe/tests/malformed_observe.c`
+    - `safe/tests/capture_malformed_baseline.sh`
+    - `safe/tests/malformed/`
+    - `safe/tests/malformed/manifest.txt`
+    - `safe/tests/malformed/original-baseline.txt`
+    - `safe/tests/compat/`
+    - `safe/tests/compat/README.md`
+    - `safe/tests/perf_compare.sh`
+    - `relevant_cves.json`
+    - `test-original.sh`
+    - `dependents.json`
+    - `original/`
+    - `original/gif_lib.h`
+    - `original/gif_hash.h`
+    - `original/tests/public_api_regress.c`
+    - `original/tests/`
+    - `original/pic/`
+    
+    ## Specific Things To Verify
+    - software-tester execution of the runtime-dependent Docker subset plus the relevant local regression matrix.
+    - Run the commands in the check section below exactly as written from the repository root.
+    - Confirm the relevant phase success criteria listed below still hold.
+    
+    ### `check_03_runtime_matrix`
+    - `Phase ID`: `check_03_runtime_matrix`
+    - `Type`: `check`
+    - `bounce_target`: `impl_03_runtime_dependents`
+    - `Purpose`: software-tester execution of the runtime-dependent Docker subset plus the relevant local regression matrix.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    cargo build --manifest-path safe/Cargo.toml --release
+    make -C safe/tests ORIGINAL_INCLUDEDIR="$PWD/original" ORIGINAL_TESTS_DIR="$PWD/original/tests" ORIGINAL_PIC_DIR="$PWD/original/pic" LIBGIF_INCLUDEDIR="$PWD/safe/include" LIBGIF_LIBDIR="$PWD/safe/target/release" test gif2rgb-regress link-compat-regress internal-export-regress malformed-regress malformed-baseline-regress compat-regress
+    original_build_dir="$(mktemp -d)"
+    trap 'rm -rf "$original_build_dir"' EXIT
+    cp -a original/. "$original_build_dir"
+    make -C "$original_build_dir" libgif.so libgif.a
+    cc -std=gnu99 -Wall -Wextra -I"$original_build_dir" "$original_build_dir/tests/public_api_regress.c" "$original_build_dir/libgif.a" -o /tmp/public_api_regress.original
+    cc -std=gnu99 -Wall -Wextra -I"$PWD/original" original/tests/public_api_regress.c "$PWD/safe/target/release/libgif.a" -o /tmp/public_api_regress.safe
+    safe/tests/perf_compare.sh /tmp/public_api_regress.original /tmp/public_api_regress.safe | tee /tmp/perf-runtime.log
+    grep -E '^PERF workload=render-welcome2 .* threshold=2\.00$' /tmp/perf-runtime.log
+    grep -E '^PERF workload=render-treescap-interlaced .* threshold=2\.00$' /tmp/perf-runtime.log
+    grep -E '^PERF workload=highlevel-copy-fire .* threshold=2\.00$' /tmp/perf-runtime.log
+    grep -E '^PERF workload=rgb-to-gif-gifgrid .* threshold=2\.00$' /tmp/perf-runtime.log
+    python3 - <<'PY'
+    import pathlib
+    import re
+    import sys
+    
+    violations = []
+    for path in sorted(pathlib.Path("safe/src").rglob("*.rs")):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for idx, line in enumerate(lines, 1):
+            if re.search(r"\bunsafe\b", line):
+                window = lines[max(0, idx - 4):idx - 1]
+                if not any("SAFETY:" in prev for prev in window):
+                    violations.append(f"{path}:{idx}")
+    
+    if violations:
+        print("unsafe without nearby SAFETY comment:", file=sys.stderr)
+        print("\n".join(violations), file=sys.stderr)
+        sys.exit(1)
+    PY
+    bash -o pipefail -c './test-original.sh --scope runtime | tee /tmp/test-runtime.log'
+    python3 - <<'PY'
+    from pathlib import Path
+    import sys
+    
+    log = Path('/tmp/test-runtime.log').read_text(encoding='utf-8')
+    required = [
+        '==> Building safe Debian packages',
+        '==> Installing safe Debian packages',
+        '==> Verifying runtime linkage to active packaged giflib',
+        '==> giflib-tools',
+        '==> webp',
+        '==> fbi',
+        '==> mtpaint',
+        '==> tracker-extract',
+        '==> libextractor-plugin-gif',
+        '==> libcamlimages-ocaml',
+        '==> libgdal34t64',
+        'All downstream checks passed',
+    ]
+    forbidden = [
+        '==> gdal (source)',
+        '==> exactimage (source)',
+        '==> sail (source)',
+        '==> libwebp (source)',
+        '==> imlib2 (source)',
+    ]
+    
+    missing = [marker for marker in required if marker not in log]
+    unexpected = [marker for marker in forbidden if marker in log]
+    count_errors = [
+        marker for marker in required[:3]
+        if log.count(marker) != 1
+    ]
+    
+    if missing or unexpected or count_errors:
+        if missing:
+            print('missing runtime-scope markers:', *missing, sep='\n', file=sys.stderr)
+        if unexpected:
+            print('unexpected source-scope markers during runtime scope:', *unexpected, sep='\n', file=sys.stderr)
+        if count_errors:
+            print('shared setup markers must appear exactly once during runtime scope:', *count_errors, sep='\n', file=sys.stderr)
+        sys.exit(1)
+    PY
+    ```
+    
+    ## Success Criteria
+    - Every runtime-only downstream failure is fixed with a committed local reproducer or deterministic local regression target.
+    - `--scope runtime` runs the shared setup once, covers every runtime marker, and excludes every source-build marker.
+    - `check_03_runtime_matrix` and `check_03_runtime_review` both pass.
+    
+    After your analysis, end with exactly one of:
+    
+    VERDICT: PASS
+    VERDICT: FAIL: <reason>
+- id: check_03_runtime_review
+  type: check
+  bounce_target: impl_03_runtime_dependents
+  prompt: |
+    Reviewer Role: Senior reviewer for `check_03_runtime_review` in the GIFLIB compatibility workflow.
+    
+    You are reviewing the output of `impl_03_runtime_dependents`. Do not implement new functionality or make repository changes unless a listed command requires harmless local build artifacts; your job is to inspect and verify.
+    
+    Work from the repository root. This prompt is self-contained. Consume the existing artifacts listed below in place; do not refetch, recollect, rediscover, or regenerate them from scratch.
+    
+    ## Phase Name
+    Runtime Dependent Matrix Fixes
+    
+    ## Check Phase ID
+    `check_03_runtime_review`
+    
+    ## Bounce Target
+    `impl_03_runtime_dependents`
+    
+    ## Preexisting Inputs
+    - `safe/Cargo.toml`
+    - `safe/build.rs`
+    - `safe/src/`
+    - `safe/include/gif_lib.h`
+    - `safe/debian/control`
+    - `safe/debian/rules`
+    - `safe/debian/changelog`
+    - `safe/debian/libgif7.symbols`
+    - `safe/debian/libgif7.install`
+    - `safe/debian/libgif-dev.install`
+    - `safe/debian/pkgconfig/libgif7.pc.in`
+    - `safe/debian/source/format`
+    - `safe/tests/Makefile`
+    - `safe/tests/internal_exports_smoke.c`
+    - `safe/tests/malformed_observe.c`
+    - `safe/tests/capture_malformed_baseline.sh`
+    - `safe/tests/malformed/`
+    - `safe/tests/malformed/manifest.txt`
+    - `safe/tests/malformed/original-baseline.txt`
+    - `safe/tests/compat/`
+    - `safe/tests/compat/README.md`
+    - `safe/tests/perf_compare.sh`
+    - `relevant_cves.json`
+    - `test-original.sh`
+    - `dependents.json`
+    - `original/`
+    - `original/gif_lib.h`
+    - `original/gif_hash.h`
+    - `original/tests/public_api_regress.c`
+    - `original/tests/`
+    - `original/pic/`
+    
+    ## Specific Things To Verify
+    - senior-tester review of runtime-dependent fixes and their regression coverage.
+    - Run the commands in the check section below exactly as written from the repository root.
+    - Confirm the relevant phase success criteria listed below still hold.
+    - Every runtime-only bug found in Docker must have a permanent local reproducer under `safe/tests/compat/` or an explicit extension in `safe/tests/Makefile`.
+    - Do not vendor any downstream source package contents into the repository.
+    - Keep fixes minimal to the failing runtime behavior; avoid unrelated package or source-build churn unless required by the bug.
+    
+    ### `check_03_runtime_review`
+    - `Phase ID`: `check_03_runtime_review`
+    - `Type`: `check`
+    - `bounce_target`: `impl_03_runtime_dependents`
+    - `Purpose`: senior-tester review of runtime-dependent fixes and their regression coverage.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    git show --stat --name-only --format=fuller HEAD^..HEAD
+    find safe/tests/compat -maxdepth 2 -type f | LC_ALL=C sort
+    rg -n 'runtime|giftext|gif2webp|fbi|mtpaint|tracker|extractor|camlimages|gdal' safe/tests/compat safe/tests/Makefile test-original.sh
+    rg -n 'SAFETY:' safe/src
+    rg -n 'catch_panic_or|catch_error_or|catch_gif_error_or|catch_gif_and_error_or' safe/src
+    ```
+    - `Review Checks`:
+      - Every runtime-only bug found in Docker must have a permanent local reproducer under `safe/tests/compat/` or an explicit extension in `safe/tests/Makefile`.
+      - Do not vendor any downstream source package contents into the repository.
+      - Keep fixes minimal to the failing runtime behavior; avoid unrelated package or source-build churn unless required by the bug.
+    
+    ## Success Criteria
+    - Every runtime-only downstream failure is fixed with a committed local reproducer or deterministic local regression target.
+    - `--scope runtime` runs the shared setup once, covers every runtime marker, and excludes every source-build marker.
+    - `check_03_runtime_matrix` and `check_03_runtime_review` both pass.
+    
+    After your analysis, end with exactly one of:
+    
+    VERDICT: PASS
+    VERDICT: FAIL: <reason>
+- id: impl_04_source_dependents
+  type: implement
+  bounce_target: null
+  prompt: |
+    You are implementing phase `impl_04_source_dependents` for the GIFLIB compatibility workflow in this repository.
+    
+    Work from the repository root. This prompt is self-contained. Consume or update the existing artifacts listed below in place; do not refetch, recollect, rediscover, or regenerate them from scratch. Reuse and update the committed repository artifacts that already exist instead of recreating them from zero. Commit all phase work to git before yielding.
+    
+    # Phase 4
+    
+    ## Phase Name
+    Source-Build Dependent Matrix Fixes
+    
+    ## Implement Phase ID
+    `impl_04_source_dependents`
+    
+    ## Preexisting Inputs
+    - `safe/Cargo.toml`
+    - `safe/build.rs`
+    - `safe/src/`
+    - `safe/include/gif_lib.h`
+    - `safe/debian/control`
+    - `safe/debian/rules`
+    - `safe/debian/changelog`
+    - `safe/debian/libgif7.symbols`
+    - `safe/debian/libgif7.install`
+    - `safe/debian/libgif-dev.install`
+    - `safe/debian/pkgconfig/libgif7.pc.in`
+    - `safe/debian/source/format`
+    - `safe/tests/Makefile`
+    - `safe/tests/internal_exports_smoke.c`
+    - `safe/tests/malformed_observe.c`
+    - `safe/tests/capture_malformed_baseline.sh`
+    - `safe/tests/malformed/`
+    - `safe/tests/malformed/manifest.txt`
+    - `safe/tests/malformed/original-baseline.txt`
+    - `safe/tests/compat/`
+    - `safe/tests/compat/README.md`
+    - `safe/tests/perf_compare.sh`
+    - `relevant_cves.json`
+    - `test-original.sh`
+    - `dependents.json`
+    - `original/`
+    - `original/gif_lib.h`
+    - `original/gif_hash.h`
+    - `original/debian/libgif7.symbols`
+    - `original/tests/public_api_regress.c`
+    - `original/tests/alloc.summary`
+    - `original/tests/legacy.summary`
+    - `original/tests/`
+    - `original/pic/`
+    
+    ## New Outputs
+    - fixes for source-build and package-surface compatibility failures
+    - issue-specific source-build reproducers under `safe/tests/compat/`
+    - corresponding `compat-regress` registrations
+    
+    ## File Changes
+    - update `safe/debian/changelog`
+    - update `safe/debian/control`
+    - update `safe/debian/libgif-dev.install`
+    - update `safe/debian/libgif7.install`
+    - update `safe/debian/libgif7.symbols`
+    - update `safe/debian/pkgconfig/libgif7.pc.in`
+    - update `safe/debian/rules`
+    - update `safe/build.rs`
+    - update `safe/Cargo.toml`
+    - update `safe/src/lib.rs`
+    - update `safe/src/ffi.rs`
+    - update `safe/src/*.rs` only if a source-build failure proves a true library bug
+    - update `safe/tests/Makefile`
+    - create or update issue-specific reproducers under `safe/tests/compat/`
+    - update `test-original.sh` only if source-scope orchestration itself needs refinement
+    
+    ## Implementation Details
+    - Focus on compile, link, and install-surface compatibility: extracted package contents, `pkg-config`, static and shared linkability, symbol completeness, and header-only source compatibility.
+    - Treat these source consumers as the concrete build gate: `gdal`, `exactimage`, `sail`, `libwebp`, and `imlib2`.
+    - When a full downstream source build reveals a bug, add the smallest stable local reproducer available: a compile or link smoke test, a `pkg-config` assertion, a static or shared link test, or a small C reproducer under `safe/tests/compat/`.
+    - Keep `safe/debian/libgif7.symbols` aligned to `original/debian/libgif7.symbols`.
+    - Preserve the library-only package set and the `+safelibs` version suffix.
+    - Keep consuming `test-original.sh`, `dependents.json`, `original/tests/public_api_regress.c`, and the existing oracle corpus in place instead of vendoring downstream source snapshots.
+    - Because this phase leaves files under `safe/debian/`, `safe/build.rs`, `safe/Cargo.toml`, and public install/layout behavior in scope, rerun the extracted-package assertions and compile `original/tests/public_api_regress.c` against the extracted `libgif-dev` package contents before yielding.
+    - If this phase edits decoder/slurp/data-path files such as `safe/src/decode.rs`, `safe/src/slurp.rs`, `safe/src/io.rs`, `safe/src/state.rs`, or `safe/src/helpers.rs`, rerun `render-regress`, `gifclrmp-regress`, `giffilter-regress`, `giftext-regress`, `malformed-regress`, and `malformed-baseline-regress` before yielding.
+    - If this phase edits encoder/write/quantize/drawing files such as `safe/src/encode.rs`, `safe/src/gcb.rs`, `safe/src/helpers.rs`, `safe/src/quantize.rs`, or `safe/src/draw.rs`, rerun `gifbuild-regress`, `gifsponge-regress`, `giftool-regress`, `giffix-regress`, `gif2rgb-regress`, `gifecho-regress`, `drawing-regress`, and `gifwedge-regress` before yielding.
+    - If this phase edits hot-path files `safe/src/decode.rs`, `safe/src/encode.rs`, `safe/src/quantize.rs`, `safe/src/helpers.rs`, `safe/src/state.rs`, or `safe/src/io.rs`, rerun `safe/tests/perf_compare.sh` before yielding.
+    - If this phase edits FFI entry points or raw-pointer-heavy code, rerun the `SAFETY:` audit and keep panic fencing at the C ABI boundary before yielding.
+    - Do not change `safe/include/gif_lib.h` unless the original header is being recopied verbatim; source-compat fixes belong in the Rust implementation or packaging surface.
+    
+    ## Verification Phases
+    ### `check_04_source_matrix`
+    - `Phase ID`: `check_04_source_matrix`
+    - `Type`: `check`
+    - `bounce_target`: `impl_04_source_dependents`
+    - `Purpose`: software-tester execution of the source-build dependent Docker subset plus package-surface and local compatibility checks most likely to catch header, export, and `pkg-config` regressions.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    cargo build --manifest-path safe/Cargo.toml --release
+    if rg -n 'cc::Build|legacy backend|gif_legacy|\.\./original/.*\.c' safe/build.rs safe/Cargo.toml safe/src; then
+      echo 'production build reintroduced original C sources' >&2
+      exit 1
+    fi
+    diff -u original/debian/libgif7.symbols safe/debian/libgif7.symbols
+    rm -f libgif7_*.deb libgif-dev_*.deb libgif7-dbgsym_*.ddeb giflib_*.changes giflib_*.buildinfo
+    (cd safe && dpkg-buildpackage -us -uc -b)
+    if find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) ! -name 'libgif7_*.deb' ! -name 'libgif-dev_*.deb' ! -name 'libgif7-dbgsym_*.ddeb' | grep -q .; then
+      echo 'unexpected non-library Debian package artifact' >&2
+      find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) >&2
+      exit 1
+    fi
+    if find . -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) ! -name 'giflib_*.changes' ! -name 'giflib_*.buildinfo' | grep -q .; then
+      echo 'unexpected non-giflib build metadata artifact' >&2
+      find . -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) >&2
+      exit 1
+    fi
+    make -C safe/tests ORIGINAL_INCLUDEDIR="$PWD/original" ORIGINAL_TESTS_DIR="$PWD/original/tests" ORIGINAL_PIC_DIR="$PWD/original/pic" LIBGIF_INCLUDEDIR="$PWD/safe/include" LIBGIF_LIBDIR="$PWD/safe/target/release" safe-header-regress test gif2rgb-regress link-compat-regress internal-export-regress malformed-regress malformed-baseline-regress compat-regress
+    runtime_matches="$(find . -maxdepth 1 -type f -name 'libgif7_*.deb' | LC_ALL=C sort)"
+    dev_matches="$(find . -maxdepth 1 -type f -name 'libgif-dev_*.deb' | LC_ALL=C sort)"
+    dbgsym_matches="$(find . -maxdepth 1 -type f -name 'libgif7-dbgsym_*.ddeb' | LC_ALL=C sort)"
+    changes_matches="$(find . -maxdepth 1 -type f -name 'giflib_*.changes' | LC_ALL=C sort)"
+    buildinfo_matches="$(find . -maxdepth 1 -type f -name 'giflib_*.buildinfo' | LC_ALL=C sort)"
+    [[ "$(printf '%s\n' "$runtime_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$dev_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$dbgsym_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$changes_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$buildinfo_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
+    runtime_deb="$(printf '%s\n' "$runtime_matches" | head -n1)"
+    dev_deb="$(printf '%s\n' "$dev_matches" | head -n1)"
+    dbgsym_ddeb="$(printf '%s\n' "$dbgsym_matches" | head -n1)"
+    changes_file="$(printf '%s\n' "$changes_matches" | head -n1)"
+    buildinfo_file="$(printf '%s\n' "$buildinfo_matches" | head -n1)"
+    test -n "$runtime_deb"
+    test -n "$dev_deb"
+    test -n "$dbgsym_ddeb"
+    test -n "$changes_file"
+    test -n "$buildinfo_file"
+    runtime_tmp="$(mktemp -d)"
+    dev_tmp="$(mktemp -d)"
+    dpkg-deb -x "$runtime_deb" "$runtime_tmp"
+    dpkg-deb -x "$dev_deb" "$dev_tmp"
+    runtime_real="$(find "$runtime_tmp/usr/lib/$multiarch" -maxdepth 1 -type f -name 'libgif.so.7.*' | LC_ALL=C sort | head -n1)"
+    test -n "$runtime_real"
+    readelf -d "$runtime_real" | grep -E 'SONAME.*libgif\.so\.7'
+    test -L "$runtime_tmp/usr/lib/$multiarch/libgif.so.7"
+    test -f "$dev_tmp/usr/include/gif_lib.h"
+    cmp -s "$dev_tmp/usr/include/gif_lib.h" original/gif_lib.h
+    test -f "$dev_tmp/usr/lib/$multiarch/libgif.a"
+    test -L "$dev_tmp/usr/lib/$multiarch/libgif.so"
+    pkgconfig_dir="$dev_tmp/usr/lib/$multiarch/pkgconfig"
+    test -f "$pkgconfig_dir/libgif7.pc"
+    libgif_pc="$pkgconfig_dir/libgif.pc"
+    if [ -L "$libgif_pc" ]; then
+      test "$(readlink "$libgif_pc")" = "libgif7.pc"
+    else
+      test -f "$libgif_pc"
+    fi
+    env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif7
+    env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif
+    test "$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=libdir libgif7)" = "/usr/lib/$multiarch"
+    test "$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=includedir libgif7)" = "/usr/include"
+    if find "$runtime_tmp" "$dev_tmp" \( -type f -o -type l \) \( -name 'gif_hash.h' -o -name 'gif_lib_private.h' \) | grep -q .; then
+      echo 'unexpected private header installed in packages' >&2
+      exit 1
+    fi
+    cc -std=gnu99 -Wall -Wextra -I"$dev_tmp/usr/include" original/tests/public_api_regress.c "$dev_tmp/usr/lib/$multiarch/libgif.a" -o /tmp/public_api_regress.pkg
+    /tmp/public_api_regress.pkg legacy | diff -u original/tests/legacy.summary -
+    /tmp/public_api_regress.pkg alloc | diff -u original/tests/alloc.summary -
+    original_build_dir="$(mktemp -d)"
+    trap 'rm -rf "$original_build_dir"' EXIT
+    cp -a original/. "$original_build_dir"
+    make -C "$original_build_dir" libgif.so libgif.a
+    cc -std=gnu99 -Wall -Wextra -I"$original_build_dir" "$original_build_dir/tests/public_api_regress.c" "$original_build_dir/libgif.a" -o /tmp/public_api_regress.original
+    cc -std=gnu99 -Wall -Wextra -I"$PWD/original" original/tests/public_api_regress.c "$PWD/safe/target/release/libgif.a" -o /tmp/public_api_regress.safe
+    safe/tests/perf_compare.sh /tmp/public_api_regress.original /tmp/public_api_regress.safe | tee /tmp/perf-source.log
+    grep -E '^PERF workload=render-welcome2 .* threshold=2\.00$' /tmp/perf-source.log
+    grep -E '^PERF workload=render-treescap-interlaced .* threshold=2\.00$' /tmp/perf-source.log
+    grep -E '^PERF workload=highlevel-copy-fire .* threshold=2\.00$' /tmp/perf-source.log
+    grep -E '^PERF workload=rgb-to-gif-gifgrid .* threshold=2\.00$' /tmp/perf-source.log
+    python3 - <<'PY'
+    import pathlib
+    import re
+    import sys
+    
+    violations = []
+    for path in sorted(pathlib.Path("safe/src").rglob("*.rs")):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for idx, line in enumerate(lines, 1):
+            if re.search(r"\bunsafe\b", line):
+                window = lines[max(0, idx - 4):idx - 1]
+                if not any("SAFETY:" in prev for prev in window):
+                    violations.append(f"{path}:{idx}")
+    
+    if violations:
+        print("unsafe without nearby SAFETY comment:", file=sys.stderr)
+        print("\n".join(violations), file=sys.stderr)
+        sys.exit(1)
+    PY
+    bash -o pipefail -c './test-original.sh --scope source | tee /tmp/test-source.log'
+    python3 - <<'PY'
+    from pathlib import Path
+    import sys
+    
+    log = Path('/tmp/test-source.log').read_text(encoding='utf-8')
+    required = [
+        '==> Building safe Debian packages',
+        '==> Installing safe Debian packages',
+        '==> Verifying runtime linkage to active packaged giflib',
+        '==> gdal (source)',
+        '==> exactimage (source)',
+        '==> sail (source)',
+        '==> libwebp (source)',
+        '==> imlib2 (source)',
+        'All downstream checks passed',
+    ]
+    forbidden = [
+        '==> giflib-tools',
+        '==> webp',
+        '==> fbi',
+        '==> mtpaint',
+        '==> tracker-extract',
+        '==> libextractor-plugin-gif',
+        '==> libcamlimages-ocaml',
+        '==> libgdal34t64',
+    ]
+    
+    missing = [marker for marker in required if marker not in log]
+    unexpected = [marker for marker in forbidden if marker in log]
+    count_errors = [
+        marker for marker in required[:3]
+        if log.count(marker) != 1
+    ]
+    
+    if missing or unexpected or count_errors:
+        if missing:
+            print('missing source-scope markers:', *missing, sep='\n', file=sys.stderr)
+        if unexpected:
+            print('unexpected runtime-app markers during source scope:', *unexpected, sep='\n', file=sys.stderr)
+        if count_errors:
+            print('shared setup markers must appear exactly once during source scope:', *count_errors, sep='\n', file=sys.stderr)
+        sys.exit(1)
+    PY
+    ```
+    
+    ### `check_04_source_review`
+    - `Phase ID`: `check_04_source_review`
+    - `Type`: `check`
+    - `bounce_target`: `impl_04_source_dependents`
+    - `Purpose`: senior-tester review of source-build and package-surface fixes together with their regression coverage.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    git show --stat --name-only --format=fuller HEAD^..HEAD
+    rg -n 'pkg-config|libgif7\.pc|libgif\.pc|libgif\.so|libgif\.a|symbols|--scope source' safe/debian test-original.sh safe/tests/Makefile safe/tests/compat
+    find safe/tests/compat -maxdepth 2 -type f | LC_ALL=C sort
+    rg -n 'catch_panic_or|catch_error_or|catch_gif_error_or|catch_gif_and_error_or' safe/src
+    ```
+    - `Review Checks`:
+      - Every source-build failure found in Docker must have a local reproducer or package-surface check that can fail without rebuilding a full downstream source tree.
+      - Do not change `safe/include/gif_lib.h` unless the original header itself is being copied verbatim again; source-compat fixes should happen in Rust implementation or packaging, not by inventing a new header surface.
+      - Do not vendor downstream source snapshots into the repository.
+    
+    ## Success Criteria
+    - Every source-build or package-surface bug found in Docker is backed by a committed local reproducer or deterministic package-surface assertion.
+    - `--scope source` runs the shared setup once, covers every source marker, and excludes every runtime-app marker.
+    - `check_04_source_matrix` and `check_04_source_review` both pass.
+    
+    ## Git Commit Requirement
+    The implementer must commit work to git before yielding. The phase must end as exactly one non-merge commit whose subject starts with `impl_04_source_dependents:`, and after that commit `git status --short --untracked-files=no` must be empty, `git diff --quiet --exit-code` must succeed, and `git diff --cached --quiet --exit-code` must succeed.
+- id: check_04_source_matrix
+  type: check
+  bounce_target: impl_04_source_dependents
+  prompt: |
+    Reviewer Role: Software tester verifier for `check_04_source_matrix` in the GIFLIB compatibility workflow.
+    
+    You are reviewing the output of `impl_04_source_dependents`. Do not implement new functionality or make repository changes unless a listed command requires harmless local build artifacts; your job is to inspect and verify.
+    
+    Work from the repository root. This prompt is self-contained. Consume the existing artifacts listed below in place; do not refetch, recollect, rediscover, or regenerate them from scratch.
+    
+    ## Phase Name
+    Source-Build Dependent Matrix Fixes
+    
+    ## Check Phase ID
+    `check_04_source_matrix`
+    
+    ## Bounce Target
+    `impl_04_source_dependents`
+    
+    ## Preexisting Inputs
+    - `safe/Cargo.toml`
+    - `safe/build.rs`
+    - `safe/src/`
+    - `safe/include/gif_lib.h`
+    - `safe/debian/control`
+    - `safe/debian/rules`
+    - `safe/debian/changelog`
+    - `safe/debian/libgif7.symbols`
+    - `safe/debian/libgif7.install`
+    - `safe/debian/libgif-dev.install`
+    - `safe/debian/pkgconfig/libgif7.pc.in`
+    - `safe/debian/source/format`
+    - `safe/tests/Makefile`
+    - `safe/tests/internal_exports_smoke.c`
+    - `safe/tests/malformed_observe.c`
+    - `safe/tests/capture_malformed_baseline.sh`
+    - `safe/tests/malformed/`
+    - `safe/tests/malformed/manifest.txt`
+    - `safe/tests/malformed/original-baseline.txt`
+    - `safe/tests/compat/`
+    - `safe/tests/compat/README.md`
+    - `safe/tests/perf_compare.sh`
+    - `relevant_cves.json`
+    - `test-original.sh`
+    - `dependents.json`
+    - `original/`
+    - `original/gif_lib.h`
+    - `original/gif_hash.h`
+    - `original/debian/libgif7.symbols`
+    - `original/tests/public_api_regress.c`
+    - `original/tests/alloc.summary`
+    - `original/tests/legacy.summary`
+    - `original/tests/`
+    - `original/pic/`
+    
+    ## Specific Things To Verify
+    - software-tester execution of the source-build dependent Docker subset plus package-surface and local compatibility checks most likely to catch header, export, and `pkg-config` regressions.
+    - Run the commands in the check section below exactly as written from the repository root.
+    - Confirm the relevant phase success criteria listed below still hold.
+    
+    ### `check_04_source_matrix`
+    - `Phase ID`: `check_04_source_matrix`
+    - `Type`: `check`
+    - `bounce_target`: `impl_04_source_dependents`
+    - `Purpose`: software-tester execution of the source-build dependent Docker subset plus package-surface and local compatibility checks most likely to catch header, export, and `pkg-config` regressions.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    cargo build --manifest-path safe/Cargo.toml --release
+    if rg -n 'cc::Build|legacy backend|gif_legacy|\.\./original/.*\.c' safe/build.rs safe/Cargo.toml safe/src; then
+      echo 'production build reintroduced original C sources' >&2
+      exit 1
+    fi
+    diff -u original/debian/libgif7.symbols safe/debian/libgif7.symbols
+    rm -f libgif7_*.deb libgif-dev_*.deb libgif7-dbgsym_*.ddeb giflib_*.changes giflib_*.buildinfo
+    (cd safe && dpkg-buildpackage -us -uc -b)
+    if find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) ! -name 'libgif7_*.deb' ! -name 'libgif-dev_*.deb' ! -name 'libgif7-dbgsym_*.ddeb' | grep -q .; then
+      echo 'unexpected non-library Debian package artifact' >&2
+      find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) >&2
+      exit 1
+    fi
+    if find . -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) ! -name 'giflib_*.changes' ! -name 'giflib_*.buildinfo' | grep -q .; then
+      echo 'unexpected non-giflib build metadata artifact' >&2
+      find . -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) >&2
+      exit 1
+    fi
+    make -C safe/tests ORIGINAL_INCLUDEDIR="$PWD/original" ORIGINAL_TESTS_DIR="$PWD/original/tests" ORIGINAL_PIC_DIR="$PWD/original/pic" LIBGIF_INCLUDEDIR="$PWD/safe/include" LIBGIF_LIBDIR="$PWD/safe/target/release" safe-header-regress test gif2rgb-regress link-compat-regress internal-export-regress malformed-regress malformed-baseline-regress compat-regress
+    runtime_matches="$(find . -maxdepth 1 -type f -name 'libgif7_*.deb' | LC_ALL=C sort)"
+    dev_matches="$(find . -maxdepth 1 -type f -name 'libgif-dev_*.deb' | LC_ALL=C sort)"
+    dbgsym_matches="$(find . -maxdepth 1 -type f -name 'libgif7-dbgsym_*.ddeb' | LC_ALL=C sort)"
+    changes_matches="$(find . -maxdepth 1 -type f -name 'giflib_*.changes' | LC_ALL=C sort)"
+    buildinfo_matches="$(find . -maxdepth 1 -type f -name 'giflib_*.buildinfo' | LC_ALL=C sort)"
+    [[ "$(printf '%s\n' "$runtime_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$dev_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$dbgsym_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$changes_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$buildinfo_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
+    runtime_deb="$(printf '%s\n' "$runtime_matches" | head -n1)"
+    dev_deb="$(printf '%s\n' "$dev_matches" | head -n1)"
+    dbgsym_ddeb="$(printf '%s\n' "$dbgsym_matches" | head -n1)"
+    changes_file="$(printf '%s\n' "$changes_matches" | head -n1)"
+    buildinfo_file="$(printf '%s\n' "$buildinfo_matches" | head -n1)"
+    test -n "$runtime_deb"
+    test -n "$dev_deb"
+    test -n "$dbgsym_ddeb"
+    test -n "$changes_file"
+    test -n "$buildinfo_file"
+    runtime_tmp="$(mktemp -d)"
+    dev_tmp="$(mktemp -d)"
+    dpkg-deb -x "$runtime_deb" "$runtime_tmp"
+    dpkg-deb -x "$dev_deb" "$dev_tmp"
+    runtime_real="$(find "$runtime_tmp/usr/lib/$multiarch" -maxdepth 1 -type f -name 'libgif.so.7.*' | LC_ALL=C sort | head -n1)"
+    test -n "$runtime_real"
+    readelf -d "$runtime_real" | grep -E 'SONAME.*libgif\.so\.7'
+    test -L "$runtime_tmp/usr/lib/$multiarch/libgif.so.7"
+    test -f "$dev_tmp/usr/include/gif_lib.h"
+    cmp -s "$dev_tmp/usr/include/gif_lib.h" original/gif_lib.h
+    test -f "$dev_tmp/usr/lib/$multiarch/libgif.a"
+    test -L "$dev_tmp/usr/lib/$multiarch/libgif.so"
+    pkgconfig_dir="$dev_tmp/usr/lib/$multiarch/pkgconfig"
+    test -f "$pkgconfig_dir/libgif7.pc"
+    libgif_pc="$pkgconfig_dir/libgif.pc"
+    if [ -L "$libgif_pc" ]; then
+      test "$(readlink "$libgif_pc")" = "libgif7.pc"
+    else
+      test -f "$libgif_pc"
+    fi
+    env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif7
+    env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif
+    test "$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=libdir libgif7)" = "/usr/lib/$multiarch"
+    test "$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=includedir libgif7)" = "/usr/include"
+    if find "$runtime_tmp" "$dev_tmp" \( -type f -o -type l \) \( -name 'gif_hash.h' -o -name 'gif_lib_private.h' \) | grep -q .; then
+      echo 'unexpected private header installed in packages' >&2
+      exit 1
+    fi
+    cc -std=gnu99 -Wall -Wextra -I"$dev_tmp/usr/include" original/tests/public_api_regress.c "$dev_tmp/usr/lib/$multiarch/libgif.a" -o /tmp/public_api_regress.pkg
+    /tmp/public_api_regress.pkg legacy | diff -u original/tests/legacy.summary -
+    /tmp/public_api_regress.pkg alloc | diff -u original/tests/alloc.summary -
+    original_build_dir="$(mktemp -d)"
+    trap 'rm -rf "$original_build_dir"' EXIT
+    cp -a original/. "$original_build_dir"
+    make -C "$original_build_dir" libgif.so libgif.a
+    cc -std=gnu99 -Wall -Wextra -I"$original_build_dir" "$original_build_dir/tests/public_api_regress.c" "$original_build_dir/libgif.a" -o /tmp/public_api_regress.original
+    cc -std=gnu99 -Wall -Wextra -I"$PWD/original" original/tests/public_api_regress.c "$PWD/safe/target/release/libgif.a" -o /tmp/public_api_regress.safe
+    safe/tests/perf_compare.sh /tmp/public_api_regress.original /tmp/public_api_regress.safe | tee /tmp/perf-source.log
+    grep -E '^PERF workload=render-welcome2 .* threshold=2\.00$' /tmp/perf-source.log
+    grep -E '^PERF workload=render-treescap-interlaced .* threshold=2\.00$' /tmp/perf-source.log
+    grep -E '^PERF workload=highlevel-copy-fire .* threshold=2\.00$' /tmp/perf-source.log
+    grep -E '^PERF workload=rgb-to-gif-gifgrid .* threshold=2\.00$' /tmp/perf-source.log
+    python3 - <<'PY'
+    import pathlib
+    import re
+    import sys
+    
+    violations = []
+    for path in sorted(pathlib.Path("safe/src").rglob("*.rs")):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for idx, line in enumerate(lines, 1):
+            if re.search(r"\bunsafe\b", line):
+                window = lines[max(0, idx - 4):idx - 1]
+                if not any("SAFETY:" in prev for prev in window):
+                    violations.append(f"{path}:{idx}")
+    
+    if violations:
+        print("unsafe without nearby SAFETY comment:", file=sys.stderr)
+        print("\n".join(violations), file=sys.stderr)
+        sys.exit(1)
+    PY
+    bash -o pipefail -c './test-original.sh --scope source | tee /tmp/test-source.log'
+    python3 - <<'PY'
+    from pathlib import Path
+    import sys
+    
+    log = Path('/tmp/test-source.log').read_text(encoding='utf-8')
+    required = [
+        '==> Building safe Debian packages',
+        '==> Installing safe Debian packages',
+        '==> Verifying runtime linkage to active packaged giflib',
+        '==> gdal (source)',
+        '==> exactimage (source)',
+        '==> sail (source)',
+        '==> libwebp (source)',
+        '==> imlib2 (source)',
+        'All downstream checks passed',
+    ]
+    forbidden = [
+        '==> giflib-tools',
+        '==> webp',
+        '==> fbi',
+        '==> mtpaint',
+        '==> tracker-extract',
+        '==> libextractor-plugin-gif',
+        '==> libcamlimages-ocaml',
+        '==> libgdal34t64',
+    ]
+    
+    missing = [marker for marker in required if marker not in log]
+    unexpected = [marker for marker in forbidden if marker in log]
+    count_errors = [
+        marker for marker in required[:3]
+        if log.count(marker) != 1
+    ]
+    
+    if missing or unexpected or count_errors:
+        if missing:
+            print('missing source-scope markers:', *missing, sep='\n', file=sys.stderr)
+        if unexpected:
+            print('unexpected runtime-app markers during source scope:', *unexpected, sep='\n', file=sys.stderr)
+        if count_errors:
+            print('shared setup markers must appear exactly once during source scope:', *count_errors, sep='\n', file=sys.stderr)
+        sys.exit(1)
+    PY
+    ```
+    
+    ## Success Criteria
+    - Every source-build or package-surface bug found in Docker is backed by a committed local reproducer or deterministic package-surface assertion.
+    - `--scope source` runs the shared setup once, covers every source marker, and excludes every runtime-app marker.
+    - `check_04_source_matrix` and `check_04_source_review` both pass.
+    
+    After your analysis, end with exactly one of:
+    
+    VERDICT: PASS
+    VERDICT: FAIL: <reason>
+- id: check_04_source_review
+  type: check
+  bounce_target: impl_04_source_dependents
+  prompt: |
+    Reviewer Role: Senior reviewer for `check_04_source_review` in the GIFLIB compatibility workflow.
+    
+    You are reviewing the output of `impl_04_source_dependents`. Do not implement new functionality or make repository changes unless a listed command requires harmless local build artifacts; your job is to inspect and verify.
+    
+    Work from the repository root. This prompt is self-contained. Consume the existing artifacts listed below in place; do not refetch, recollect, rediscover, or regenerate them from scratch.
+    
+    ## Phase Name
+    Source-Build Dependent Matrix Fixes
+    
+    ## Check Phase ID
+    `check_04_source_review`
+    
+    ## Bounce Target
+    `impl_04_source_dependents`
+    
+    ## Preexisting Inputs
+    - `safe/Cargo.toml`
+    - `safe/build.rs`
+    - `safe/src/`
+    - `safe/include/gif_lib.h`
+    - `safe/debian/control`
+    - `safe/debian/rules`
+    - `safe/debian/changelog`
+    - `safe/debian/libgif7.symbols`
+    - `safe/debian/libgif7.install`
+    - `safe/debian/libgif-dev.install`
+    - `safe/debian/pkgconfig/libgif7.pc.in`
+    - `safe/debian/source/format`
+    - `safe/tests/Makefile`
+    - `safe/tests/internal_exports_smoke.c`
+    - `safe/tests/malformed_observe.c`
+    - `safe/tests/capture_malformed_baseline.sh`
+    - `safe/tests/malformed/`
+    - `safe/tests/malformed/manifest.txt`
+    - `safe/tests/malformed/original-baseline.txt`
+    - `safe/tests/compat/`
+    - `safe/tests/compat/README.md`
+    - `safe/tests/perf_compare.sh`
+    - `relevant_cves.json`
+    - `test-original.sh`
+    - `dependents.json`
+    - `original/`
+    - `original/gif_lib.h`
+    - `original/gif_hash.h`
+    - `original/debian/libgif7.symbols`
+    - `original/tests/public_api_regress.c`
+    - `original/tests/alloc.summary`
+    - `original/tests/legacy.summary`
+    - `original/tests/`
+    - `original/pic/`
+    
+    ## Specific Things To Verify
+    - senior-tester review of source-build and package-surface fixes together with their regression coverage.
+    - Run the commands in the check section below exactly as written from the repository root.
+    - Confirm the relevant phase success criteria listed below still hold.
+    - Every source-build failure found in Docker must have a local reproducer or package-surface check that can fail without rebuilding a full downstream source tree.
+    - Do not change `safe/include/gif_lib.h` unless the original header itself is being copied verbatim again; source-compat fixes should happen in Rust implementation or packaging, not by inventing a new header surface.
+    - Do not vendor downstream source snapshots into the repository.
+    
+    ### `check_04_source_review`
+    - `Phase ID`: `check_04_source_review`
+    - `Type`: `check`
+    - `bounce_target`: `impl_04_source_dependents`
+    - `Purpose`: senior-tester review of source-build and package-surface fixes together with their regression coverage.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    git show --stat --name-only --format=fuller HEAD^..HEAD
+    rg -n 'pkg-config|libgif7\.pc|libgif\.pc|libgif\.so|libgif\.a|symbols|--scope source' safe/debian test-original.sh safe/tests/Makefile safe/tests/compat
+    find safe/tests/compat -maxdepth 2 -type f | LC_ALL=C sort
+    rg -n 'catch_panic_or|catch_error_or|catch_gif_error_or|catch_gif_and_error_or' safe/src
+    ```
+    - `Review Checks`:
+      - Every source-build failure found in Docker must have a local reproducer or package-surface check that can fail without rebuilding a full downstream source tree.
+      - Do not change `safe/include/gif_lib.h` unless the original header itself is being copied verbatim again; source-compat fixes should happen in Rust implementation or packaging, not by inventing a new header surface.
+      - Do not vendor downstream source snapshots into the repository.
+    
+    ## Success Criteria
+    - Every source-build or package-surface bug found in Docker is backed by a committed local reproducer or deterministic package-surface assertion.
+    - `--scope source` runs the shared setup once, covers every source marker, and excludes every runtime-app marker.
+    - `check_04_source_matrix` and `check_04_source_review` both pass.
+    
+    After your analysis, end with exactly one of:
+    
+    VERDICT: PASS
+    VERDICT: FAIL: <reason>
+- id: impl_05_regression_catchall
+  type: implement
+  bounce_target: null
+  prompt: |
+    You are implementing phase `impl_05_regression_catchall` for the GIFLIB compatibility workflow in this repository.
+    
+    Work from the repository root. This prompt is self-contained. Consume or update the existing artifacts listed below in place; do not refetch, recollect, rediscover, or regenerate them from scratch. Reuse and update the committed repository artifacts that already exist instead of recreating them from zero. Commit all phase work to git before yielding.
+    
+    # Phase 5
+    
+    ## Phase Name
+    Catch-All Compatibility Fixes, Review, And Final Full Matrix
+    
+    ## Implement Phase ID
+    `impl_05_regression_catchall`
+    
+    ## Preexisting Inputs
+    - `safe/Cargo.toml`
+    - `safe/build.rs`
+    - `safe/src/`
+    - `safe/include/gif_lib.h`
+    - `safe/debian/control`
+    - `safe/debian/rules`
+    - `safe/debian/changelog`
+    - `safe/debian/libgif7.symbols`
+    - `safe/debian/libgif7.install`
+    - `safe/debian/libgif-dev.install`
+    - `safe/debian/pkgconfig/libgif7.pc.in`
+    - `safe/debian/source/format`
+    - `safe/tests/Makefile`
+    - `safe/tests/abi_layout.c`
+    - `safe/tests/internal_exports_smoke.c`
+    - `safe/tests/malformed_observe.c`
+    - `safe/tests/capture_malformed_baseline.sh`
+    - `safe/tests/malformed/`
+    - `safe/tests/malformed/manifest.txt`
+    - `safe/tests/malformed/original-baseline.txt`
+    - `safe/tests/compat/`
+    - `safe/tests/compat/README.md`
+    - `safe/tests/perf_compare.sh`
+    - `test-original.sh`
+    - `dependents.json`
+    - `relevant_cves.json`
+    - `original/`
+    - `original/gif_lib.h`
+    - `original/gif_hash.h`
+    - `original/debian/libgif7.symbols`
+    - `original/tests/public_api_regress.c`
+    - `original/tests/alloc.summary`
+    - `original/tests/legacy.summary`
+    - `original/tests/`
+    - `original/pic/`
+    
+    ## New Outputs
+    - final catch-all fixes only
+    - complete local regression inventory for every discovered downstream issue
+    - final verified full replacement matrix
+    
+    ## File Changes
+    - update `safe/src/*.rs` as required by remaining compatibility bugs
+    - update `safe/tests/Makefile`
+    - update `safe/tests/compat/*`
+    - update `safe/tests/perf_compare.sh` only if a benchmark bug is found
+    - update `safe/debian/*` only if package-surface fixes remain
+    - update `test-original.sh` only if final scope orchestration or logging still needs cleanup
+    
+    ## Implementation Details
+    - This is the catch-all phase and the only bounce target for the final full-matrix verifier.
+    - Do not open new fronts here. Only fix issues proven by earlier checks or by `check_05_final_full`.
+    - Every remaining issue must leave behind a local regression in `safe/tests/compat/` or an existing deterministic target in `safe/tests/Makefile`.
+    - Preserve the Rust-only production build and the byte-for-byte public header match.
+    - Preserve current malformed baseline behavior unless intentionally adding new malformed fixtures with explicit provenance updates.
+    - Keep panic fencing and `SAFETY:` comments intact while resolving final bugs.
+    - Keep consuming `test-original.sh`, `dependents.json`, `relevant_cves.json`, `safe/tests/malformed/`, and the tracked `original/` oracle tree in place rather than regenerating or vendoring replacements.
+    - If this phase edits decoder/slurp/data-path files such as `safe/src/decode.rs`, `safe/src/slurp.rs`, `safe/src/io.rs`, `safe/src/state.rs`, or `safe/src/helpers.rs`, rerun `render-regress`, `gifclrmp-regress`, `giffilter-regress`, `giftext-regress`, `malformed-regress`, and `malformed-baseline-regress` before yielding.
+    - If this phase edits encoder/write/quantize/drawing files such as `safe/src/encode.rs`, `safe/src/gcb.rs`, `safe/src/helpers.rs`, `safe/src/quantize.rs`, or `safe/src/draw.rs`, rerun `gifbuild-regress`, `gifsponge-regress`, `giftool-regress`, `giffix-regress`, `gif2rgb-regress`, `gifecho-regress`, `drawing-regress`, and `gifwedge-regress` before yielding.
+    - Because this phase can still leave files under `safe/debian/`, `safe/build.rs`, `safe/Cargo.toml`, and public install/layout behavior in scope, rerun the extracted-package assertions and compile `original/tests/public_api_regress.c` against the extracted `libgif-dev` package contents before yielding if any such files or behaviors changed.
+    - If this phase edits hot-path files `safe/src/decode.rs`, `safe/src/encode.rs`, `safe/src/quantize.rs`, `safe/src/helpers.rs`, `safe/src/state.rs`, or `safe/src/io.rs`, rerun `safe/tests/perf_compare.sh` before yielding.
+    - If this phase edits FFI entry points or raw-pointer-heavy code, rerun the `SAFETY:` audit and keep panic fencing at the C ABI boundary before yielding.
+    - Keep `--scope all` and the implicit default path running the shared setup exactly once, then the full runtime subset followed by the full source subset.
+    
+    ## Final Verification Sequence
+    The section-5 end-to-end final verification framing remains in force for this phase. After phases 1 through 4 complete, the workflow must still prove the finished port with this sequence:
+    
+    1. Confirm the tracked-clean handoff, the Rust-only production build, and byte-for-byte public-header parity.
+    2. Verify ABI layout and exported-symbol parity against the original oracle.
+    3. Run the full local regression matrix, including `gif2rgb-regress`, malformed coverage, link-compat coverage, internal-export coverage, and `compat-regress`.
+    4. Rebuild Debian packages from `safe/` and verify the extracted install surface plus `original/tests/public_api_regress.c` against the extracted `libgif-dev` contents.
+    5. Rebuild the original baseline from a temporary copy of `original/` and rerun the fixed performance gate.
+    6. Run the complete downstream replacement matrix with `./test-original.sh --scope all`, including the shared-setup-once and runtime-before-source ordering checks.
+    7. Run the final `unsafe` audit.
+    
+    Any failure in steps 1 through 7 should bounce to `impl_05_regression_catchall`, because this phase is explicitly reserved as the final catch-all repair phase. `check_05_regression_matrix`, `check_05_senior_review`, and `check_05_final_full` collectively enforce that end-to-end sequence, with `check_05_final_full` remaining the terminal blocker for the workflow.
+    
+    ## Verification Phases
+    ### `check_05_regression_matrix`
+    - `Phase ID`: `check_05_regression_matrix`
+    - `Type`: `check`
+    - `bounce_target`: `impl_05_regression_catchall`
+    - `Purpose`: software-tester verification that all discovered issues now have local regressions and that the full local, package, and performance matrix is stable before the last Docker pass.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    cargo build --manifest-path safe/Cargo.toml --release
+    if rg -n 'cc::Build|legacy backend|gif_legacy|\.\./original/.*\.c' safe/build.rs safe/Cargo.toml safe/src; then
+      echo 'production build reintroduced original C sources' >&2
+      exit 1
+    fi
+    cmp -s safe/include/gif_lib.h original/gif_lib.h
+    cc -I"$PWD/safe/include" -I"$PWD/original" safe/tests/abi_layout.c -o /tmp/giflib-abi-layout
+    /tmp/giflib-abi-layout
+    diff -u original/debian/libgif7.symbols safe/debian/libgif7.symbols
+    make -C safe/tests ORIGINAL_INCLUDEDIR="$PWD/original" ORIGINAL_TESTS_DIR="$PWD/original/tests" ORIGINAL_PIC_DIR="$PWD/original/pic" LIBGIF_INCLUDEDIR="$PWD/safe/include" LIBGIF_LIBDIR="$PWD/safe/target/release" test gif2rgb-regress link-compat-regress internal-export-regress malformed-regress malformed-baseline-regress compat-regress
+    rm -f libgif7_*.deb libgif-dev_*.deb libgif7-dbgsym_*.ddeb giflib_*.changes giflib_*.buildinfo
+    (cd safe && dpkg-buildpackage -us -uc -b)
+    if find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) ! -name 'libgif7_*.deb' ! -name 'libgif-dev_*.deb' ! -name 'libgif7-dbgsym_*.ddeb' | grep -q .; then
+      echo 'unexpected non-library Debian package artifact' >&2
+      find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) >&2
+      exit 1
+    fi
+    if find . -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) ! -name 'giflib_*.changes' ! -name 'giflib_*.buildinfo' | grep -q .; then
+      echo 'unexpected non-giflib build metadata artifact' >&2
+      find . -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) >&2
+      exit 1
+    fi
+    runtime_matches="$(find . -maxdepth 1 -type f -name 'libgif7_*.deb' | LC_ALL=C sort)"
+    dev_matches="$(find . -maxdepth 1 -type f -name 'libgif-dev_*.deb' | LC_ALL=C sort)"
+    dbgsym_matches="$(find . -maxdepth 1 -type f -name 'libgif7-dbgsym_*.ddeb' | LC_ALL=C sort)"
+    changes_matches="$(find . -maxdepth 1 -type f -name 'giflib_*.changes' | LC_ALL=C sort)"
+    buildinfo_matches="$(find . -maxdepth 1 -type f -name 'giflib_*.buildinfo' | LC_ALL=C sort)"
+    [[ "$(printf '%s\n' "$runtime_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$dev_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$dbgsym_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$changes_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$buildinfo_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
+    runtime_deb="$(printf '%s\n' "$runtime_matches" | head -n1)"
+    dev_deb="$(printf '%s\n' "$dev_matches" | head -n1)"
+    dbgsym_ddeb="$(printf '%s\n' "$dbgsym_matches" | head -n1)"
+    changes_file="$(printf '%s\n' "$changes_matches" | head -n1)"
+    buildinfo_file="$(printf '%s\n' "$buildinfo_matches" | head -n1)"
+    test -n "$runtime_deb"
+    test -n "$dev_deb"
+    test -n "$dbgsym_ddeb"
+    test -n "$changes_file"
+    test -n "$buildinfo_file"
+    runtime_tmp="$(mktemp -d)"
+    dev_tmp="$(mktemp -d)"
+    dpkg-deb -x "$runtime_deb" "$runtime_tmp"
+    dpkg-deb -x "$dev_deb" "$dev_tmp"
+    runtime_real="$(find "$runtime_tmp/usr/lib/$multiarch" -maxdepth 1 -type f -name 'libgif.so.7.*' | LC_ALL=C sort | head -n1)"
+    test -n "$runtime_real"
+    readelf -d "$runtime_real" | grep -E 'SONAME.*libgif\.so\.7'
+    test -L "$runtime_tmp/usr/lib/$multiarch/libgif.so.7"
+    test -f "$dev_tmp/usr/include/gif_lib.h"
+    cmp -s "$dev_tmp/usr/include/gif_lib.h" original/gif_lib.h
+    test -f "$dev_tmp/usr/lib/$multiarch/libgif.a"
+    test -L "$dev_tmp/usr/lib/$multiarch/libgif.so"
+    pkgconfig_dir="$dev_tmp/usr/lib/$multiarch/pkgconfig"
+    test -f "$pkgconfig_dir/libgif7.pc"
+    libgif_pc="$pkgconfig_dir/libgif.pc"
+    if [ -L "$libgif_pc" ]; then
+      test "$(readlink "$libgif_pc")" = "libgif7.pc"
+    else
+      test -f "$libgif_pc"
+    fi
+    env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif7
+    env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif
+    test "$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=libdir libgif7)" = "/usr/lib/$multiarch"
+    test "$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=includedir libgif7)" = "/usr/include"
+    if find "$runtime_tmp" "$dev_tmp" \( -type f -o -type l \) \( -name 'gif_hash.h' -o -name 'gif_lib_private.h' \) | grep -q .; then
+      echo 'unexpected private header installed in packages' >&2
+      exit 1
+    fi
+    cc -std=gnu99 -Wall -Wextra -I"$dev_tmp/usr/include" original/tests/public_api_regress.c "$dev_tmp/usr/lib/$multiarch/libgif.a" -o /tmp/public_api_regress.pkg
+    /tmp/public_api_regress.pkg legacy | diff -u original/tests/legacy.summary -
+    /tmp/public_api_regress.pkg alloc | diff -u original/tests/alloc.summary -
+    original_build_dir="$(mktemp -d)"
+    trap 'rm -rf "$original_build_dir"' EXIT
+    cp -a original/. "$original_build_dir"
+    make -C "$original_build_dir" libgif.so libgif.a
+    cc -std=gnu99 -Wall -Wextra -I"$original_build_dir" "$original_build_dir/tests/public_api_regress.c" "$original_build_dir/libgif.a" -o /tmp/public_api_regress.original
+    cc -std=gnu99 -Wall -Wextra -I"$PWD/original" original/tests/public_api_regress.c "$PWD/safe/target/release/libgif.a" -o /tmp/public_api_regress.safe
+    safe/tests/perf_compare.sh /tmp/public_api_regress.original /tmp/public_api_regress.safe | tee /tmp/perf.log
+    grep -E '^PERF workload=render-welcome2 .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=render-treescap-interlaced .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=highlevel-copy-fire .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=rgb-to-gif-gifgrid .* threshold=2\.00$' /tmp/perf.log
+    python3 - <<'PY'
+    import pathlib
+    import re
+    import sys
+    
+    violations = []
+    for path in sorted(pathlib.Path("safe/src").rglob("*.rs")):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for idx, line in enumerate(lines, 1):
+            if re.search(r"\bunsafe\b", line):
+                window = lines[max(0, idx - 4):idx - 1]
+                if not any("SAFETY:" in prev for prev in window):
+                    violations.append(f"{path}:{idx}")
+    
+    if violations:
+        print("unsafe without nearby SAFETY comment:", file=sys.stderr)
+        print("\n".join(violations), file=sys.stderr)
+        sys.exit(1)
+    PY
+    ```
+    
+    ### `check_05_senior_review`
+    - `Phase ID`: `check_05_senior_review`
+    - `Type`: `check`
+    - `bounce_target`: `impl_05_regression_catchall`
+    - `Purpose`: senior-tester review of the final catch-all fix set, with emphasis on regression completeness, minimality, and safety boundaries.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    git show --stat --name-only --format=fuller HEAD^..HEAD
+    find safe/tests/compat -maxdepth 2 -type f | LC_ALL=C sort
+    rg -n '^compat-regress:' safe/tests/Makefile
+    rg -n 'SAFETY:' safe/src
+    rg -n 'catch_panic_or|catch_error_or|catch_gif_error_or|catch_gif_and_error_or' safe/src
+    ```
+    - `Review Checks`:
+      - Every issue found in phases 3 and 4 must be traceable to a committed local reproducer.
+      - `safe/tests/malformed/original-baseline.txt` must not change unless a new malformed fixture was intentionally added and its provenance was documented.
+      - `dependents.json` must remain unchanged unless the inventory itself was proven wrong and that decision was explicitly justified.
+    
+    ### `check_05_final_full`
+    - `Phase ID`: `check_05_final_full`
+    - `Type`: `check`
+    - `bounce_target`: `impl_05_regression_catchall`
+    - `Purpose`: final software-tester gate across the complete local, package, performance, and downstream-replacement matrix.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    cargo build --manifest-path safe/Cargo.toml --release
+    if rg -n 'cc::Build|legacy backend|gif_legacy|\.\./original/.*\.c' safe/build.rs safe/Cargo.toml safe/src; then
+      echo 'production build reintroduced original C sources' >&2
+      exit 1
+    fi
+    cmp -s safe/include/gif_lib.h original/gif_lib.h
+    cc -I"$PWD/safe/include" -I"$PWD/original" safe/tests/abi_layout.c -o /tmp/giflib-abi-layout
+    /tmp/giflib-abi-layout
+    objdump -T safe/target/release/libgif.so | awk '$4 != "*UND*" && $6 == "Base" { print $7 "@Base" }' | sort > /tmp/safe-symbols.txt
+    sed -n '3,$p' original/debian/libgif7.symbols | awk '{print $1}' | sort > /tmp/original-symbols.txt
+    diff -u /tmp/original-symbols.txt /tmp/safe-symbols.txt
+    test "$(objdump -T safe/target/release/libgif.so | awk '/ GifAsciiTable8x8$/{print $3, $6, $7}')" = "DO Base GifAsciiTable8x8"
+    diff -u original/debian/libgif7.symbols safe/debian/libgif7.symbols
+    make -C safe/tests ORIGINAL_INCLUDEDIR="$PWD/original" ORIGINAL_TESTS_DIR="$PWD/original/tests" ORIGINAL_PIC_DIR="$PWD/original/pic" LIBGIF_INCLUDEDIR="$PWD/safe/include" LIBGIF_LIBDIR="$PWD/safe/target/release" test gif2rgb-regress link-compat-regress internal-export-regress malformed-regress malformed-baseline-regress compat-regress
+    rm -f libgif7_*.deb libgif-dev_*.deb libgif7-dbgsym_*.ddeb giflib_*.changes giflib_*.buildinfo
+    (cd safe && dpkg-buildpackage -us -uc -b)
+    if find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) ! -name 'libgif7_*.deb' ! -name 'libgif-dev_*.deb' ! -name 'libgif7-dbgsym_*.ddeb' | grep -q .; then
+      echo 'unexpected non-library Debian package artifact' >&2
+      find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) >&2
+      exit 1
+    fi
+    if find . -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) ! -name 'giflib_*.changes' ! -name 'giflib_*.buildinfo' | grep -q .; then
+      echo 'unexpected non-giflib build metadata artifact' >&2
+      find . -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) >&2
+      exit 1
+    fi
+    runtime_matches="$(find . -maxdepth 1 -type f -name 'libgif7_*.deb' | LC_ALL=C sort)"
+    dev_matches="$(find . -maxdepth 1 -type f -name 'libgif-dev_*.deb' | LC_ALL=C sort)"
+    dbgsym_matches="$(find . -maxdepth 1 -type f -name 'libgif7-dbgsym_*.ddeb' | LC_ALL=C sort)"
+    changes_matches="$(find . -maxdepth 1 -type f -name 'giflib_*.changes' | LC_ALL=C sort)"
+    buildinfo_matches="$(find . -maxdepth 1 -type f -name 'giflib_*.buildinfo' | LC_ALL=C sort)"
+    [[ "$(printf '%s\n' "$runtime_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$dev_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$dbgsym_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$changes_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$buildinfo_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
+    runtime_deb="$(printf '%s\n' "$runtime_matches" | head -n1)"
+    dev_deb="$(printf '%s\n' "$dev_matches" | head -n1)"
+    dbgsym_ddeb="$(printf '%s\n' "$dbgsym_matches" | head -n1)"
+    changes_file="$(printf '%s\n' "$changes_matches" | head -n1)"
+    buildinfo_file="$(printf '%s\n' "$buildinfo_matches" | head -n1)"
+    test -n "$runtime_deb"
+    test -n "$dev_deb"
+    test -n "$dbgsym_ddeb"
+    test -n "$changes_file"
+    test -n "$buildinfo_file"
+    runtime_tmp="$(mktemp -d)"
+    dev_tmp="$(mktemp -d)"
+    dpkg-deb -x "$runtime_deb" "$runtime_tmp"
+    dpkg-deb -x "$dev_deb" "$dev_tmp"
+    runtime_real="$(find "$runtime_tmp/usr/lib/$multiarch" -maxdepth 1 -type f -name 'libgif.so.7.*' | LC_ALL=C sort | head -n1)"
+    test -n "$runtime_real"
+    readelf -d "$runtime_real" | grep -E 'SONAME.*libgif\.so\.7'
+    test -L "$runtime_tmp/usr/lib/$multiarch/libgif.so.7"
+    test -f "$dev_tmp/usr/include/gif_lib.h"
+    cmp -s "$dev_tmp/usr/include/gif_lib.h" original/gif_lib.h
+    test -f "$dev_tmp/usr/lib/$multiarch/libgif.a"
+    test -L "$dev_tmp/usr/lib/$multiarch/libgif.so"
+    pkgconfig_dir="$dev_tmp/usr/lib/$multiarch/pkgconfig"
+    test -f "$pkgconfig_dir/libgif7.pc"
+    libgif_pc="$pkgconfig_dir/libgif.pc"
+    if [ -L "$libgif_pc" ]; then
+      test "$(readlink "$libgif_pc")" = "libgif7.pc"
+    else
+      test -f "$libgif_pc"
+    fi
+    env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif7
+    env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif
+    test "$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=libdir libgif7)" = "/usr/lib/$multiarch"
+    test "$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=includedir libgif7)" = "/usr/include"
+    if find "$runtime_tmp" "$dev_tmp" \( -type f -o -type l \) \( -name 'gif_hash.h' -o -name 'gif_lib_private.h' \) | grep -q .; then
+      echo 'unexpected private header installed in packages' >&2
+      exit 1
+    fi
+    cc -std=gnu99 -Wall -Wextra -I"$dev_tmp/usr/include" original/tests/public_api_regress.c "$dev_tmp/usr/lib/$multiarch/libgif.a" -o /tmp/public_api_regress.pkg
+    /tmp/public_api_regress.pkg legacy | diff -u original/tests/legacy.summary -
+    /tmp/public_api_regress.pkg alloc | diff -u original/tests/alloc.summary -
+    bash -o pipefail -c './test-original.sh --scope all | tee /tmp/test-all.log'
+    python3 - <<'PY'
+    from pathlib import Path
+    import sys
+    
+    log = Path('/tmp/test-all.log').read_text(encoding='utf-8')
+    shared = [
+        '==> Building safe Debian packages',
+        '==> Installing safe Debian packages',
+        '==> Verifying runtime linkage to active packaged giflib',
+    ]
+    runtime = [
+        '==> giflib-tools',
+        '==> webp',
+        '==> fbi',
+        '==> mtpaint',
+        '==> tracker-extract',
+        '==> libextractor-plugin-gif',
+        '==> libcamlimages-ocaml',
+        '==> libgdal34t64',
+    ]
+    source = [
+        '==> gdal (source)',
+        '==> exactimage (source)',
+        '==> sail (source)',
+        '==> libwebp (source)',
+        '==> imlib2 (source)',
+    ]
+    required = shared + runtime + source + ['All downstream checks passed']
+    
+    missing = [marker for marker in required if marker not in log]
+    count_errors = [marker for marker in shared if log.count(marker) != 1]
+    
+    if missing or count_errors:
+        if missing:
+            print('missing all-scope markers:', *missing, sep='\n', file=sys.stderr)
+        if count_errors:
+            print('shared setup markers must appear exactly once during all scope:', *count_errors, sep='\n', file=sys.stderr)
+        sys.exit(1)
+    
+    if max(log.index(marker) for marker in runtime) >= min(log.index(marker) for marker in source):
+        print('runtime markers must complete before source markers begin during all scope', file=sys.stderr)
+        sys.exit(1)
+    PY
+    original_build_dir="$(mktemp -d)"
+    trap 'rm -rf "$original_build_dir"' EXIT
+    cp -a original/. "$original_build_dir"
+    make -C "$original_build_dir" libgif.so libgif.a
+    cc -std=gnu99 -Wall -Wextra -I"$original_build_dir" "$original_build_dir/tests/public_api_regress.c" "$original_build_dir/libgif.a" -o /tmp/public_api_regress.original
+    cc -std=gnu99 -Wall -Wextra -I"$PWD/original" original/tests/public_api_regress.c "$PWD/safe/target/release/libgif.a" -o /tmp/public_api_regress.safe
+    safe/tests/perf_compare.sh /tmp/public_api_regress.original /tmp/public_api_regress.safe | tee /tmp/perf.log
+    grep -E '^PERF workload=render-welcome2 .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=render-treescap-interlaced .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=highlevel-copy-fire .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=rgb-to-gif-gifgrid .* threshold=2\.00$' /tmp/perf.log
+    ```
+    
+    ## Success Criteria
+    - Every remaining compatibility failure is reduced to a committed local regression or deterministic local/package-surface assertion.
+    - The full local matrix, package-surface checks, performance gate, and final `--scope all` downstream run all pass.
+    - `check_05_regression_matrix`, `check_05_senior_review`, and `check_05_final_full` all pass.
+    
+    ## Git Commit Requirement
+    The implementer must commit work to git before yielding. The phase must end as exactly one non-merge commit whose subject starts with `impl_05_regression_catchall:`, and after that commit `git status --short --untracked-files=no` must be empty, `git diff --quiet --exit-code` must succeed, and `git diff --cached --quiet --exit-code` must succeed.
+- id: check_05_regression_matrix
+  type: check
+  bounce_target: impl_05_regression_catchall
+  prompt: |
+    Reviewer Role: Software tester verifier for `check_05_regression_matrix` in the GIFLIB compatibility workflow.
+    
+    You are reviewing the output of `impl_05_regression_catchall`. Do not implement new functionality or make repository changes unless a listed command requires harmless local build artifacts; your job is to inspect and verify.
+    
+    Work from the repository root. This prompt is self-contained. Consume the existing artifacts listed below in place; do not refetch, recollect, rediscover, or regenerate them from scratch.
+    
+    ## Phase Name
+    Catch-All Compatibility Fixes, Review, And Final Full Matrix
+    
+    ## Check Phase ID
+    `check_05_regression_matrix`
+    
+    ## Bounce Target
+    `impl_05_regression_catchall`
+    
+    ## Preexisting Inputs
+    - `safe/Cargo.toml`
+    - `safe/build.rs`
+    - `safe/src/`
+    - `safe/include/gif_lib.h`
+    - `safe/debian/control`
+    - `safe/debian/rules`
+    - `safe/debian/changelog`
+    - `safe/debian/libgif7.symbols`
+    - `safe/debian/libgif7.install`
+    - `safe/debian/libgif-dev.install`
+    - `safe/debian/pkgconfig/libgif7.pc.in`
+    - `safe/debian/source/format`
+    - `safe/tests/Makefile`
+    - `safe/tests/abi_layout.c`
+    - `safe/tests/internal_exports_smoke.c`
+    - `safe/tests/malformed_observe.c`
+    - `safe/tests/capture_malformed_baseline.sh`
+    - `safe/tests/malformed/`
+    - `safe/tests/malformed/manifest.txt`
+    - `safe/tests/malformed/original-baseline.txt`
+    - `safe/tests/compat/`
+    - `safe/tests/compat/README.md`
+    - `safe/tests/perf_compare.sh`
+    - `test-original.sh`
+    - `dependents.json`
+    - `relevant_cves.json`
+    - `original/`
+    - `original/gif_lib.h`
+    - `original/gif_hash.h`
+    - `original/debian/libgif7.symbols`
+    - `original/tests/public_api_regress.c`
+    - `original/tests/alloc.summary`
+    - `original/tests/legacy.summary`
+    - `original/tests/`
+    - `original/pic/`
+    
+    ## Specific Things To Verify
+    - software-tester verification that all discovered issues now have local regressions and that the full local, package, and performance matrix is stable before the last Docker pass.
+    - Run the commands in the check section below exactly as written from the repository root.
+    - Confirm the relevant phase success criteria listed below still hold.
+    
+    ## Final Verification Sequence
+    The section-5 end-to-end final verification framing remains in force for this phase. After phases 1 through 4 complete, the workflow must still prove the finished port with this sequence:
+    
+    1. Confirm the tracked-clean handoff, the Rust-only production build, and byte-for-byte public-header parity.
+    2. Verify ABI layout and exported-symbol parity against the original oracle.
+    3. Run the full local regression matrix, including `gif2rgb-regress`, malformed coverage, link-compat coverage, internal-export coverage, and `compat-regress`.
+    4. Rebuild Debian packages from `safe/` and verify the extracted install surface plus `original/tests/public_api_regress.c` against the extracted `libgif-dev` contents.
+    5. Rebuild the original baseline from a temporary copy of `original/` and rerun the fixed performance gate.
+    6. Run the complete downstream replacement matrix with `./test-original.sh --scope all`, including the shared-setup-once and runtime-before-source ordering checks.
+    7. Run the final `unsafe` audit.
+    
+    Any failure in steps 1 through 7 should bounce to `impl_05_regression_catchall`, because this phase is explicitly reserved as the final catch-all repair phase. `check_05_regression_matrix`, `check_05_senior_review`, and `check_05_final_full` collectively enforce that end-to-end sequence, with `check_05_final_full` remaining the terminal blocker for the workflow.
+    
+    ### `check_05_regression_matrix`
+    - `Phase ID`: `check_05_regression_matrix`
+    - `Type`: `check`
+    - `bounce_target`: `impl_05_regression_catchall`
+    - `Purpose`: software-tester verification that all discovered issues now have local regressions and that the full local, package, and performance matrix is stable before the last Docker pass.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    cargo build --manifest-path safe/Cargo.toml --release
+    if rg -n 'cc::Build|legacy backend|gif_legacy|\.\./original/.*\.c' safe/build.rs safe/Cargo.toml safe/src; then
+      echo 'production build reintroduced original C sources' >&2
+      exit 1
+    fi
+    cmp -s safe/include/gif_lib.h original/gif_lib.h
+    cc -I"$PWD/safe/include" -I"$PWD/original" safe/tests/abi_layout.c -o /tmp/giflib-abi-layout
+    /tmp/giflib-abi-layout
+    diff -u original/debian/libgif7.symbols safe/debian/libgif7.symbols
+    make -C safe/tests ORIGINAL_INCLUDEDIR="$PWD/original" ORIGINAL_TESTS_DIR="$PWD/original/tests" ORIGINAL_PIC_DIR="$PWD/original/pic" LIBGIF_INCLUDEDIR="$PWD/safe/include" LIBGIF_LIBDIR="$PWD/safe/target/release" test gif2rgb-regress link-compat-regress internal-export-regress malformed-regress malformed-baseline-regress compat-regress
+    rm -f libgif7_*.deb libgif-dev_*.deb libgif7-dbgsym_*.ddeb giflib_*.changes giflib_*.buildinfo
+    (cd safe && dpkg-buildpackage -us -uc -b)
+    if find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) ! -name 'libgif7_*.deb' ! -name 'libgif-dev_*.deb' ! -name 'libgif7-dbgsym_*.ddeb' | grep -q .; then
+      echo 'unexpected non-library Debian package artifact' >&2
+      find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) >&2
+      exit 1
+    fi
+    if find . -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) ! -name 'giflib_*.changes' ! -name 'giflib_*.buildinfo' | grep -q .; then
+      echo 'unexpected non-giflib build metadata artifact' >&2
+      find . -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) >&2
+      exit 1
+    fi
+    runtime_matches="$(find . -maxdepth 1 -type f -name 'libgif7_*.deb' | LC_ALL=C sort)"
+    dev_matches="$(find . -maxdepth 1 -type f -name 'libgif-dev_*.deb' | LC_ALL=C sort)"
+    dbgsym_matches="$(find . -maxdepth 1 -type f -name 'libgif7-dbgsym_*.ddeb' | LC_ALL=C sort)"
+    changes_matches="$(find . -maxdepth 1 -type f -name 'giflib_*.changes' | LC_ALL=C sort)"
+    buildinfo_matches="$(find . -maxdepth 1 -type f -name 'giflib_*.buildinfo' | LC_ALL=C sort)"
+    [[ "$(printf '%s\n' "$runtime_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$dev_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$dbgsym_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$changes_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$buildinfo_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
+    runtime_deb="$(printf '%s\n' "$runtime_matches" | head -n1)"
+    dev_deb="$(printf '%s\n' "$dev_matches" | head -n1)"
+    dbgsym_ddeb="$(printf '%s\n' "$dbgsym_matches" | head -n1)"
+    changes_file="$(printf '%s\n' "$changes_matches" | head -n1)"
+    buildinfo_file="$(printf '%s\n' "$buildinfo_matches" | head -n1)"
+    test -n "$runtime_deb"
+    test -n "$dev_deb"
+    test -n "$dbgsym_ddeb"
+    test -n "$changes_file"
+    test -n "$buildinfo_file"
+    runtime_tmp="$(mktemp -d)"
+    dev_tmp="$(mktemp -d)"
+    dpkg-deb -x "$runtime_deb" "$runtime_tmp"
+    dpkg-deb -x "$dev_deb" "$dev_tmp"
+    runtime_real="$(find "$runtime_tmp/usr/lib/$multiarch" -maxdepth 1 -type f -name 'libgif.so.7.*' | LC_ALL=C sort | head -n1)"
+    test -n "$runtime_real"
+    readelf -d "$runtime_real" | grep -E 'SONAME.*libgif\.so\.7'
+    test -L "$runtime_tmp/usr/lib/$multiarch/libgif.so.7"
+    test -f "$dev_tmp/usr/include/gif_lib.h"
+    cmp -s "$dev_tmp/usr/include/gif_lib.h" original/gif_lib.h
+    test -f "$dev_tmp/usr/lib/$multiarch/libgif.a"
+    test -L "$dev_tmp/usr/lib/$multiarch/libgif.so"
+    pkgconfig_dir="$dev_tmp/usr/lib/$multiarch/pkgconfig"
+    test -f "$pkgconfig_dir/libgif7.pc"
+    libgif_pc="$pkgconfig_dir/libgif.pc"
+    if [ -L "$libgif_pc" ]; then
+      test "$(readlink "$libgif_pc")" = "libgif7.pc"
+    else
+      test -f "$libgif_pc"
+    fi
+    env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif7
+    env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif
+    test "$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=libdir libgif7)" = "/usr/lib/$multiarch"
+    test "$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=includedir libgif7)" = "/usr/include"
+    if find "$runtime_tmp" "$dev_tmp" \( -type f -o -type l \) \( -name 'gif_hash.h' -o -name 'gif_lib_private.h' \) | grep -q .; then
+      echo 'unexpected private header installed in packages' >&2
+      exit 1
+    fi
+    cc -std=gnu99 -Wall -Wextra -I"$dev_tmp/usr/include" original/tests/public_api_regress.c "$dev_tmp/usr/lib/$multiarch/libgif.a" -o /tmp/public_api_regress.pkg
+    /tmp/public_api_regress.pkg legacy | diff -u original/tests/legacy.summary -
+    /tmp/public_api_regress.pkg alloc | diff -u original/tests/alloc.summary -
+    original_build_dir="$(mktemp -d)"
+    trap 'rm -rf "$original_build_dir"' EXIT
+    cp -a original/. "$original_build_dir"
+    make -C "$original_build_dir" libgif.so libgif.a
+    cc -std=gnu99 -Wall -Wextra -I"$original_build_dir" "$original_build_dir/tests/public_api_regress.c" "$original_build_dir/libgif.a" -o /tmp/public_api_regress.original
+    cc -std=gnu99 -Wall -Wextra -I"$PWD/original" original/tests/public_api_regress.c "$PWD/safe/target/release/libgif.a" -o /tmp/public_api_regress.safe
+    safe/tests/perf_compare.sh /tmp/public_api_regress.original /tmp/public_api_regress.safe | tee /tmp/perf.log
+    grep -E '^PERF workload=render-welcome2 .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=render-treescap-interlaced .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=highlevel-copy-fire .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=rgb-to-gif-gifgrid .* threshold=2\.00$' /tmp/perf.log
+    python3 - <<'PY'
+    import pathlib
+    import re
+    import sys
+    
+    violations = []
+    for path in sorted(pathlib.Path("safe/src").rglob("*.rs")):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for idx, line in enumerate(lines, 1):
+            if re.search(r"\bunsafe\b", line):
+                window = lines[max(0, idx - 4):idx - 1]
+                if not any("SAFETY:" in prev for prev in window):
+                    violations.append(f"{path}:{idx}")
+    
+    if violations:
+        print("unsafe without nearby SAFETY comment:", file=sys.stderr)
+        print("\n".join(violations), file=sys.stderr)
+        sys.exit(1)
+    PY
+    ```
+    
+    ## Success Criteria
+    - Every remaining compatibility failure is reduced to a committed local regression or deterministic local/package-surface assertion.
+    - The full local matrix, package-surface checks, performance gate, and final `--scope all` downstream run all pass.
+    - `check_05_regression_matrix`, `check_05_senior_review`, and `check_05_final_full` all pass.
+    
+    After your analysis, end with exactly one of:
+    
+    VERDICT: PASS
+    VERDICT: FAIL: <reason>
+- id: check_05_senior_review
+  type: check
+  bounce_target: impl_05_regression_catchall
+  prompt: |
+    Reviewer Role: Senior reviewer for `check_05_senior_review` in the GIFLIB compatibility workflow.
+    
+    You are reviewing the output of `impl_05_regression_catchall`. Do not implement new functionality or make repository changes unless a listed command requires harmless local build artifacts; your job is to inspect and verify.
+    
+    Work from the repository root. This prompt is self-contained. Consume the existing artifacts listed below in place; do not refetch, recollect, rediscover, or regenerate them from scratch.
+    
+    ## Phase Name
+    Catch-All Compatibility Fixes, Review, And Final Full Matrix
+    
+    ## Check Phase ID
+    `check_05_senior_review`
+    
+    ## Bounce Target
+    `impl_05_regression_catchall`
+    
+    ## Preexisting Inputs
+    - `safe/Cargo.toml`
+    - `safe/build.rs`
+    - `safe/src/`
+    - `safe/include/gif_lib.h`
+    - `safe/debian/control`
+    - `safe/debian/rules`
+    - `safe/debian/changelog`
+    - `safe/debian/libgif7.symbols`
+    - `safe/debian/libgif7.install`
+    - `safe/debian/libgif-dev.install`
+    - `safe/debian/pkgconfig/libgif7.pc.in`
+    - `safe/debian/source/format`
+    - `safe/tests/Makefile`
+    - `safe/tests/abi_layout.c`
+    - `safe/tests/internal_exports_smoke.c`
+    - `safe/tests/malformed_observe.c`
+    - `safe/tests/capture_malformed_baseline.sh`
+    - `safe/tests/malformed/`
+    - `safe/tests/malformed/manifest.txt`
+    - `safe/tests/malformed/original-baseline.txt`
+    - `safe/tests/compat/`
+    - `safe/tests/compat/README.md`
+    - `safe/tests/perf_compare.sh`
+    - `test-original.sh`
+    - `dependents.json`
+    - `relevant_cves.json`
+    - `original/`
+    - `original/gif_lib.h`
+    - `original/gif_hash.h`
+    - `original/debian/libgif7.symbols`
+    - `original/tests/public_api_regress.c`
+    - `original/tests/alloc.summary`
+    - `original/tests/legacy.summary`
+    - `original/tests/`
+    - `original/pic/`
+    
+    ## Specific Things To Verify
+    - senior-tester review of the final catch-all fix set, with emphasis on regression completeness, minimality, and safety boundaries.
+    - Run the commands in the check section below exactly as written from the repository root.
+    - Confirm the relevant phase success criteria listed below still hold.
+    - Every issue found in phases 3 and 4 must be traceable to a committed local reproducer.
+    - `safe/tests/malformed/original-baseline.txt` must not change unless a new malformed fixture was intentionally added and its provenance was documented.
+    - `dependents.json` must remain unchanged unless the inventory itself was proven wrong and that decision was explicitly justified.
+    
+    ## Final Verification Sequence
+    The section-5 end-to-end final verification framing remains in force for this phase. After phases 1 through 4 complete, the workflow must still prove the finished port with this sequence:
+    
+    1. Confirm the tracked-clean handoff, the Rust-only production build, and byte-for-byte public-header parity.
+    2. Verify ABI layout and exported-symbol parity against the original oracle.
+    3. Run the full local regression matrix, including `gif2rgb-regress`, malformed coverage, link-compat coverage, internal-export coverage, and `compat-regress`.
+    4. Rebuild Debian packages from `safe/` and verify the extracted install surface plus `original/tests/public_api_regress.c` against the extracted `libgif-dev` contents.
+    5. Rebuild the original baseline from a temporary copy of `original/` and rerun the fixed performance gate.
+    6. Run the complete downstream replacement matrix with `./test-original.sh --scope all`, including the shared-setup-once and runtime-before-source ordering checks.
+    7. Run the final `unsafe` audit.
+    
+    Any failure in steps 1 through 7 should bounce to `impl_05_regression_catchall`, because this phase is explicitly reserved as the final catch-all repair phase. `check_05_regression_matrix`, `check_05_senior_review`, and `check_05_final_full` collectively enforce that end-to-end sequence, with `check_05_final_full` remaining the terminal blocker for the workflow.
+    
+    ### `check_05_senior_review`
+    - `Phase ID`: `check_05_senior_review`
+    - `Type`: `check`
+    - `bounce_target`: `impl_05_regression_catchall`
+    - `Purpose`: senior-tester review of the final catch-all fix set, with emphasis on regression completeness, minimality, and safety boundaries.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    git show --stat --name-only --format=fuller HEAD^..HEAD
+    find safe/tests/compat -maxdepth 2 -type f | LC_ALL=C sort
+    rg -n '^compat-regress:' safe/tests/Makefile
+    rg -n 'SAFETY:' safe/src
+    rg -n 'catch_panic_or|catch_error_or|catch_gif_error_or|catch_gif_and_error_or' safe/src
+    ```
+    - `Review Checks`:
+      - Every issue found in phases 3 and 4 must be traceable to a committed local reproducer.
+      - `safe/tests/malformed/original-baseline.txt` must not change unless a new malformed fixture was intentionally added and its provenance was documented.
+      - `dependents.json` must remain unchanged unless the inventory itself was proven wrong and that decision was explicitly justified.
+    
+    ## Success Criteria
+    - Every remaining compatibility failure is reduced to a committed local regression or deterministic local/package-surface assertion.
+    - The full local matrix, package-surface checks, performance gate, and final `--scope all` downstream run all pass.
+    - `check_05_regression_matrix`, `check_05_senior_review`, and `check_05_final_full` all pass.
+    
+    After your analysis, end with exactly one of:
+    
+    VERDICT: PASS
+    VERDICT: FAIL: <reason>
+- id: check_05_final_full
+  type: check
+  bounce_target: impl_05_regression_catchall
+  prompt: |
+    Reviewer Role: Final software tester for `check_05_final_full` in the GIFLIB compatibility workflow.
+    
+    You are reviewing the output of `impl_05_regression_catchall`. Do not implement new functionality or make repository changes unless a listed command requires harmless local build artifacts; your job is to inspect and verify.
+    
+    Work from the repository root. This prompt is self-contained. Consume the existing artifacts listed below in place; do not refetch, recollect, rediscover, or regenerate them from scratch.
+    
+    ## Phase Name
+    Catch-All Compatibility Fixes, Review, And Final Full Matrix
+    
+    ## Check Phase ID
+    `check_05_final_full`
+    
+    ## Bounce Target
+    `impl_05_regression_catchall`
+    
+    ## Preexisting Inputs
+    - `safe/Cargo.toml`
+    - `safe/build.rs`
+    - `safe/src/`
+    - `safe/include/gif_lib.h`
+    - `safe/debian/control`
+    - `safe/debian/rules`
+    - `safe/debian/changelog`
+    - `safe/debian/libgif7.symbols`
+    - `safe/debian/libgif7.install`
+    - `safe/debian/libgif-dev.install`
+    - `safe/debian/pkgconfig/libgif7.pc.in`
+    - `safe/debian/source/format`
+    - `safe/tests/Makefile`
+    - `safe/tests/abi_layout.c`
+    - `safe/tests/internal_exports_smoke.c`
+    - `safe/tests/malformed_observe.c`
+    - `safe/tests/capture_malformed_baseline.sh`
+    - `safe/tests/malformed/`
+    - `safe/tests/malformed/manifest.txt`
+    - `safe/tests/malformed/original-baseline.txt`
+    - `safe/tests/compat/`
+    - `safe/tests/compat/README.md`
+    - `safe/tests/perf_compare.sh`
+    - `test-original.sh`
+    - `dependents.json`
+    - `relevant_cves.json`
+    - `original/`
+    - `original/gif_lib.h`
+    - `original/gif_hash.h`
+    - `original/debian/libgif7.symbols`
+    - `original/tests/public_api_regress.c`
+    - `original/tests/alloc.summary`
+    - `original/tests/legacy.summary`
+    - `original/tests/`
+    - `original/pic/`
+    
+    ## Specific Things To Verify
+    - final software-tester gate across the complete local, package, performance, and downstream-replacement matrix.
+    - Run the commands in the check section below exactly as written from the repository root.
+    - Confirm the relevant phase success criteria listed below still hold.
+    
+    ## Final Verification Sequence
+    The section-5 end-to-end final verification framing remains in force for this phase. After phases 1 through 4 complete, the workflow must still prove the finished port with this sequence:
+    
+    1. Confirm the tracked-clean handoff, the Rust-only production build, and byte-for-byte public-header parity.
+    2. Verify ABI layout and exported-symbol parity against the original oracle.
+    3. Run the full local regression matrix, including `gif2rgb-regress`, malformed coverage, link-compat coverage, internal-export coverage, and `compat-regress`.
+    4. Rebuild Debian packages from `safe/` and verify the extracted install surface plus `original/tests/public_api_regress.c` against the extracted `libgif-dev` contents.
+    5. Rebuild the original baseline from a temporary copy of `original/` and rerun the fixed performance gate.
+    6. Run the complete downstream replacement matrix with `./test-original.sh --scope all`, including the shared-setup-once and runtime-before-source ordering checks.
+    7. Run the final `unsafe` audit.
+    
+    Any failure in steps 1 through 7 should bounce to `impl_05_regression_catchall`, because this phase is explicitly reserved as the final catch-all repair phase. `check_05_regression_matrix`, `check_05_senior_review`, and `check_05_final_full` collectively enforce that end-to-end sequence, with `check_05_final_full` remaining the terminal blocker for the workflow.
+    
+    ### `check_05_final_full`
+    - `Phase ID`: `check_05_final_full`
+    - `Type`: `check`
+    - `bounce_target`: `impl_05_regression_catchall`
+    - `Purpose`: final software-tester gate across the complete local, package, performance, and downstream-replacement matrix.
+    - `Commands`:
+    ```bash
+    if [ -n "$(git status --short --untracked-files=no)" ]; then
+      git status --short --untracked-files=no >&2
+      echo 'tracked worktree must be clean before verification' >&2
+      exit 1
+    fi
+    git diff --quiet --exit-code
+    git diff --cached --quiet --exit-code
+    cargo build --manifest-path safe/Cargo.toml --release
+    if rg -n 'cc::Build|legacy backend|gif_legacy|\.\./original/.*\.c' safe/build.rs safe/Cargo.toml safe/src; then
+      echo 'production build reintroduced original C sources' >&2
+      exit 1
+    fi
+    cmp -s safe/include/gif_lib.h original/gif_lib.h
+    cc -I"$PWD/safe/include" -I"$PWD/original" safe/tests/abi_layout.c -o /tmp/giflib-abi-layout
+    /tmp/giflib-abi-layout
+    objdump -T safe/target/release/libgif.so | awk '$4 != "*UND*" && $6 == "Base" { print $7 "@Base" }' | sort > /tmp/safe-symbols.txt
+    sed -n '3,$p' original/debian/libgif7.symbols | awk '{print $1}' | sort > /tmp/original-symbols.txt
+    diff -u /tmp/original-symbols.txt /tmp/safe-symbols.txt
+    test "$(objdump -T safe/target/release/libgif.so | awk '/ GifAsciiTable8x8$/{print $3, $6, $7}')" = "DO Base GifAsciiTable8x8"
+    diff -u original/debian/libgif7.symbols safe/debian/libgif7.symbols
+    make -C safe/tests ORIGINAL_INCLUDEDIR="$PWD/original" ORIGINAL_TESTS_DIR="$PWD/original/tests" ORIGINAL_PIC_DIR="$PWD/original/pic" LIBGIF_INCLUDEDIR="$PWD/safe/include" LIBGIF_LIBDIR="$PWD/safe/target/release" test gif2rgb-regress link-compat-regress internal-export-regress malformed-regress malformed-baseline-regress compat-regress
+    rm -f libgif7_*.deb libgif-dev_*.deb libgif7-dbgsym_*.ddeb giflib_*.changes giflib_*.buildinfo
+    (cd safe && dpkg-buildpackage -us -uc -b)
+    if find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) ! -name 'libgif7_*.deb' ! -name 'libgif-dev_*.deb' ! -name 'libgif7-dbgsym_*.ddeb' | grep -q .; then
+      echo 'unexpected non-library Debian package artifact' >&2
+      find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.ddeb' \) >&2
+      exit 1
+    fi
+    if find . -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) ! -name 'giflib_*.changes' ! -name 'giflib_*.buildinfo' | grep -q .; then
+      echo 'unexpected non-giflib build metadata artifact' >&2
+      find . -maxdepth 1 -type f \( -name '*.changes' -o -name '*.buildinfo' \) >&2
+      exit 1
+    fi
+    runtime_matches="$(find . -maxdepth 1 -type f -name 'libgif7_*.deb' | LC_ALL=C sort)"
+    dev_matches="$(find . -maxdepth 1 -type f -name 'libgif-dev_*.deb' | LC_ALL=C sort)"
+    dbgsym_matches="$(find . -maxdepth 1 -type f -name 'libgif7-dbgsym_*.ddeb' | LC_ALL=C sort)"
+    changes_matches="$(find . -maxdepth 1 -type f -name 'giflib_*.changes' | LC_ALL=C sort)"
+    buildinfo_matches="$(find . -maxdepth 1 -type f -name 'giflib_*.buildinfo' | LC_ALL=C sort)"
+    [[ "$(printf '%s\n' "$runtime_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$dev_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$dbgsym_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$changes_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    [[ "$(printf '%s\n' "$buildinfo_matches" | sed '/^$/d' | wc -l)" -eq 1 ]]
+    multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
+    runtime_deb="$(printf '%s\n' "$runtime_matches" | head -n1)"
+    dev_deb="$(printf '%s\n' "$dev_matches" | head -n1)"
+    dbgsym_ddeb="$(printf '%s\n' "$dbgsym_matches" | head -n1)"
+    changes_file="$(printf '%s\n' "$changes_matches" | head -n1)"
+    buildinfo_file="$(printf '%s\n' "$buildinfo_matches" | head -n1)"
+    test -n "$runtime_deb"
+    test -n "$dev_deb"
+    test -n "$dbgsym_ddeb"
+    test -n "$changes_file"
+    test -n "$buildinfo_file"
+    runtime_tmp="$(mktemp -d)"
+    dev_tmp="$(mktemp -d)"
+    dpkg-deb -x "$runtime_deb" "$runtime_tmp"
+    dpkg-deb -x "$dev_deb" "$dev_tmp"
+    runtime_real="$(find "$runtime_tmp/usr/lib/$multiarch" -maxdepth 1 -type f -name 'libgif.so.7.*' | LC_ALL=C sort | head -n1)"
+    test -n "$runtime_real"
+    readelf -d "$runtime_real" | grep -E 'SONAME.*libgif\.so\.7'
+    test -L "$runtime_tmp/usr/lib/$multiarch/libgif.so.7"
+    test -f "$dev_tmp/usr/include/gif_lib.h"
+    cmp -s "$dev_tmp/usr/include/gif_lib.h" original/gif_lib.h
+    test -f "$dev_tmp/usr/lib/$multiarch/libgif.a"
+    test -L "$dev_tmp/usr/lib/$multiarch/libgif.so"
+    pkgconfig_dir="$dev_tmp/usr/lib/$multiarch/pkgconfig"
+    test -f "$pkgconfig_dir/libgif7.pc"
+    libgif_pc="$pkgconfig_dir/libgif.pc"
+    if [ -L "$libgif_pc" ]; then
+      test "$(readlink "$libgif_pc")" = "libgif7.pc"
+    else
+      test -f "$libgif_pc"
+    fi
+    env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif7
+    env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --exists libgif
+    test "$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=libdir libgif7)" = "/usr/lib/$multiarch"
+    test "$(env PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$pkgconfig_dir" PKG_CONFIG_SYSROOT_DIR= pkg-config --variable=includedir libgif7)" = "/usr/include"
+    if find "$runtime_tmp" "$dev_tmp" \( -type f -o -type l \) \( -name 'gif_hash.h' -o -name 'gif_lib_private.h' \) | grep -q .; then
+      echo 'unexpected private header installed in packages' >&2
+      exit 1
+    fi
+    cc -std=gnu99 -Wall -Wextra -I"$dev_tmp/usr/include" original/tests/public_api_regress.c "$dev_tmp/usr/lib/$multiarch/libgif.a" -o /tmp/public_api_regress.pkg
+    /tmp/public_api_regress.pkg legacy | diff -u original/tests/legacy.summary -
+    /tmp/public_api_regress.pkg alloc | diff -u original/tests/alloc.summary -
+    bash -o pipefail -c './test-original.sh --scope all | tee /tmp/test-all.log'
+    python3 - <<'PY'
+    from pathlib import Path
+    import sys
+    
+    log = Path('/tmp/test-all.log').read_text(encoding='utf-8')
+    shared = [
+        '==> Building safe Debian packages',
+        '==> Installing safe Debian packages',
+        '==> Verifying runtime linkage to active packaged giflib',
+    ]
+    runtime = [
+        '==> giflib-tools',
+        '==> webp',
+        '==> fbi',
+        '==> mtpaint',
+        '==> tracker-extract',
+        '==> libextractor-plugin-gif',
+        '==> libcamlimages-ocaml',
+        '==> libgdal34t64',
+    ]
+    source = [
+        '==> gdal (source)',
+        '==> exactimage (source)',
+        '==> sail (source)',
+        '==> libwebp (source)',
+        '==> imlib2 (source)',
+    ]
+    required = shared + runtime + source + ['All downstream checks passed']
+    
+    missing = [marker for marker in required if marker not in log]
+    count_errors = [marker for marker in shared if log.count(marker) != 1]
+    
+    if missing or count_errors:
+        if missing:
+            print('missing all-scope markers:', *missing, sep='\n', file=sys.stderr)
+        if count_errors:
+            print('shared setup markers must appear exactly once during all scope:', *count_errors, sep='\n', file=sys.stderr)
+        sys.exit(1)
+    
+    if max(log.index(marker) for marker in runtime) >= min(log.index(marker) for marker in source):
+        print('runtime markers must complete before source markers begin during all scope', file=sys.stderr)
+        sys.exit(1)
+    PY
+    original_build_dir="$(mktemp -d)"
+    trap 'rm -rf "$original_build_dir"' EXIT
+    cp -a original/. "$original_build_dir"
+    make -C "$original_build_dir" libgif.so libgif.a
+    cc -std=gnu99 -Wall -Wextra -I"$original_build_dir" "$original_build_dir/tests/public_api_regress.c" "$original_build_dir/libgif.a" -o /tmp/public_api_regress.original
+    cc -std=gnu99 -Wall -Wextra -I"$PWD/original" original/tests/public_api_regress.c "$PWD/safe/target/release/libgif.a" -o /tmp/public_api_regress.safe
+    safe/tests/perf_compare.sh /tmp/public_api_regress.original /tmp/public_api_regress.safe | tee /tmp/perf.log
+    grep -E '^PERF workload=render-welcome2 .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=render-treescap-interlaced .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=highlevel-copy-fire .* threshold=2\.00$' /tmp/perf.log
+    grep -E '^PERF workload=rgb-to-gif-gifgrid .* threshold=2\.00$' /tmp/perf.log
+    ```
+    
+    ## Success Criteria
+    - Every remaining compatibility failure is reduced to a committed local regression or deterministic local/package-surface assertion.
+    - The full local matrix, package-surface checks, performance gate, and final `--scope all` downstream run all pass.
+    - `check_05_regression_matrix`, `check_05_senior_review`, and `check_05_final_full` all pass.
+    
+    After your analysis, end with exactly one of:
+    
+    VERDICT: PASS
+    VERDICT: FAIL: <reason>
