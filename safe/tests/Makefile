@@ -35,7 +35,19 @@ MALFORMED_FIXTURES := $(sort $(wildcard $(MALFORMED_DIR)/*.gif))
 MALFORMED_BASELINE = $(MALFORMED_DIR)/original-baseline.txt
 MALFORMED_OBSERVE = ./malformed_observe
 MALFORMED_CAPTURE = ./capture_malformed_baseline.sh
-COMPAT_REGRESS_TARGETS :=
+COMPAT_DIR = ./compat
+COMPAT_CFLAGS = $(CPPFLAGS) $(CFLAGS) -std=gnu99 -Wall -Wextra -I$(LIBGIF_INCLUDEDIR)
+COMPAT_RUNTIME_EMPTY_COMMENT = $(COMPAT_DIR)/sf-103-empty-comment/slurp_empty_comment
+COMPAT_RUNTIME_NO_IMAGE_DESC = $(COMPAT_DIR)/sf-64-no-image-desc/no_image_desc
+COMPAT_RUNTIME_METADATA = $(COMPAT_DIR)/runtime-metadata/slurp_metadata
+COMPAT_BINS = \
+	$(COMPAT_RUNTIME_EMPTY_COMMENT) \
+	$(COMPAT_RUNTIME_NO_IMAGE_DESC) \
+	$(COMPAT_RUNTIME_METADATA)
+COMPAT_REGRESS_TARGETS := \
+	compat-runtime-sf-103-empty-comment-regress \
+	compat-runtime-sf-64-no-image-desc-regress \
+	compat-runtime-metadata-regress
 
 .PHONY: test clean safe-header-regress link-compat-regress internal-export-regress \
 	legacy-regress fileio-regress alloc-regress render-regress gif2rgb-regress \
@@ -234,6 +246,30 @@ $(INTERNAL_EXPORT_SMOKE): ./internal_exports_smoke.c $(LIBGIF_STATIC) $(SAFE_HEA
 internal-export-regress: $(INTERNAL_EXPORT_SMOKE)
 	@$(INTERNAL_EXPORT_SMOKE)
 
+$(COMPAT_RUNTIME_EMPTY_COMMENT): $(COMPAT_DIR)/sf-103-empty-comment/slurp_empty_comment.c $(LIBGIF_STATIC) $(SAFE_HEADER)
+	$(CC) $(COMPAT_CFLAGS) $< $(LIBGIF_STATIC) $(LDLIBS) -o $@
+
+compat-runtime-sf-103-empty-comment-regress: $(COMPAT_RUNTIME_EMPTY_COMMENT)
+	@echo "compat(runtime): empty comment slurp for giftext/webp/tracker/libextractor/camlimages/gdal consumers."
+	@$(COMPAT_RUNTIME_EMPTY_COMMENT)
+
+$(COMPAT_RUNTIME_NO_IMAGE_DESC): $(COMPAT_DIR)/sf-64-no-image-desc/no_image_desc.c $(LIBGIF_STATIC) $(SAFE_HEADER)
+	$(CC) $(COMPAT_CFLAGS) $< $(LIBGIF_STATIC) $(LDLIBS) -o $@
+
+compat-runtime-sf-64-no-image-desc-regress: $(COMPAT_RUNTIME_NO_IMAGE_DESC)
+	@echo "compat(runtime): no-image-descriptor rejection for fbi/mtpaint/tracker/libextractor/camlimages/gdal."
+	@$(COMPAT_RUNTIME_NO_IMAGE_DESC)
+
+$(COMPAT_RUNTIME_METADATA): $(COMPAT_DIR)/runtime-metadata/slurp_metadata.c $(LIBGIF_STATIC) $(SAFE_HEADER)
+	$(CC) $(COMPAT_CFLAGS) $< $(LIBGIF_STATIC) $(LDLIBS) -o $@
+
+compat-runtime-metadata-regress: $(COMPAT_RUNTIME_METADATA)
+	@echo "compat(runtime): metadata/frame-count slurp smoke for gif2webp/tracker/libextractor/camlimages/gdal."
+	@$(COMPAT_RUNTIME_METADATA) $(PICS)/fire.gif 30 60 33 1
+	@$(COMPAT_RUNTIME_METADATA) $(PICS)/treescap-interlaced.gif 40 40 1 1
+	@$(COMPAT_RUNTIME_METADATA) $(PICS)/welcome2.gif 290 48 6 0
+
 clean:
 	rm -f $(APITEST) $(LINK_COMPAT_OBJ) $(LINK_COMPAT_STATIC) $(LINK_COMPAT_SHARED) \
-		$(INTERNAL_EXPORT_SMOKE) $(MALFORMED_OBSERVE) *.actual *.expected *.regress
+		$(INTERNAL_EXPORT_SMOKE) $(MALFORMED_OBSERVE) $(COMPAT_BINS) \
+		*.actual *.expected *.regress
