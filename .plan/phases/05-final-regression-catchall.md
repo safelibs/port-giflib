@@ -1,4 +1,4 @@
-# Phase 5
+# Phase 05
 
 ## Phase Name
 Catch-All Compatibility Fixes, Review, And Final Full Matrix
@@ -56,8 +56,6 @@ Catch-All Compatibility Fixes, Review, And Final Full Matrix
 - update `test-original.sh` only if final scope orchestration or logging still needs cleanup
 
 ## Implementation Details
-- Before yielding, create exactly one non-merge git commit for this phase, with a subject that starts with `impl_05_regression_catchall:`.
-- After that commit, leave the tracked worktree and index clean before yielding: `git status --short --untracked-files=no` must be empty, `git diff --quiet --exit-code` must succeed, and `git diff --cached --quiet --exit-code` must succeed.
 - This is the catch-all phase and the only bounce target for the final full-matrix verifier.
 - Do not open new fronts here. Only fix issues proven by earlier checks or by `check_05_final_full`.
 - Every remaining issue must leave behind a local regression in `safe/tests/compat/` or an existing deterministic target in `safe/tests/Makefile`.
@@ -66,6 +64,7 @@ Catch-All Compatibility Fixes, Review, And Final Full Matrix
 - Preserve the Rust-only production build and the byte-for-byte public header match.
 - Preserve current malformed baseline behavior unless intentionally adding new malformed fixtures with explicit provenance updates.
 - Keep panic fencing and `SAFETY:` comments intact while resolving final bugs.
+- Consume the existing regression, package, and downstream artifacts in place. Do not invent replacement matrices or duplicate oracles.
 - Treat tracked files under `original/` as immutable oracle inputs. If a local oracle rebuild is needed, build from a temporary copy instead of the tracked tree.
 - Do not change `dependents.json` or `relevant_cves.json` unless the underlying inventory or scoped CVE analysis is proven wrong.
 - Treat untracked root-level `.deb` files and generated `safe/tests/` binaries as disposable build outputs rather than trusted inputs; rebuild or overwrite them as part of verification.

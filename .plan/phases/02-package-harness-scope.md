@@ -1,4 +1,4 @@
-# Phase 2
+# Phase 02
 
 ## Phase Name
 Package Surface Lock And Downstream Harness Scoping
@@ -47,13 +47,12 @@ Package Surface Lock And Downstream Harness Scoping
 - update `safe/build.rs` only if package/install-path behavior requires it
 
 ## Implementation Details
-- Before yielding, create exactly one non-merge git commit for this phase, with a subject that starts with `impl_02_package_and_harness:`.
-- After that commit, leave the tracked worktree and index clean before yielding: `git status --short --untracked-files=no` must be empty, `git diff --quiet --exit-code` must succeed, and `git diff --cached --quiet --exit-code` must succeed.
 - Keep the package names `libgif7` and `libgif-dev`.
 - Keep the local package version suffix `+safelibs...`.
 - Preserve the current library-only packaging surface; do not introduce a `giflib-tools` package from `safe/`.
 - Preserve the existing relative `libgif.pc -> libgif7.pc` behavior or an equivalent regular-file implementation; do not use an absolute symlink.
 - Consume the existing 13-entry `dependents.json` inventory in place. Do not recollect, regenerate, or replace the downstream app list unless that inventory is proven wrong.
+- Consume existing packaging and downstream artifacts in place rather than creating sibling harnesses or alternate package metadata files.
 - Add scoped downstream execution to `test-original.sh`:
   - `--scope runtime`
   - `--scope source`

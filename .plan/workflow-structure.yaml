@@ -136,7 +136,10 @@ phases:
       - safe/debian/source/format
       - test-original.sh
       - dependents.json
-      - original/
+      - original/gif_lib.h
+      - original/debian/libgif7.symbols
+      - original/tests/
+      - original/pic/
   - order: 7
     id: impl_03_runtime_dependents
     type: implement
