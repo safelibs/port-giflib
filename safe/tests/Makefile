@@ -44,6 +44,7 @@ COMPAT_CFLAGS = $(CPPFLAGS) $(CFLAGS) -std=gnu99 -Wall -Wextra -I$(LIBGIF_INCLUD
 COMPAT_RUNTIME_EMPTY_COMMENT = $(COMPAT_DIR)/sf-103-empty-comment/slurp_empty_comment
 COMPAT_RUNTIME_NO_IMAGE_DESC = $(COMPAT_DIR)/sf-64-no-image-desc/no_image_desc
 COMPAT_RUNTIME_METADATA = $(COMPAT_DIR)/runtime-metadata/slurp_metadata
+COMPAT_RUNTIME_NATIVE_SEQUENTIAL = $(COMPAT_DIR)/runtime-fbi-mtpaint-sequential/sequential_native_decode
 COMPAT_SOURCE_GDAL_SHARED = $(COMPAT_DIR)/runtime-metadata/slurp_metadata.gdal-shared
 COMPAT_SOURCE_EXACTIMAGE = $(COMPAT_DIR)/source-exactimage-memory-roundtrip/exactimage_memory_roundtrip
 COMPAT_SOURCE_IMLIB2 = $(COMPAT_DIR)/source-imlib2-sequential/imlib2_sequential_decode
@@ -55,26 +56,32 @@ COMPAT_BINS = \
 	$(COMPAT_RUNTIME_EMPTY_COMMENT) \
 	$(COMPAT_RUNTIME_NO_IMAGE_DESC) \
 	$(COMPAT_RUNTIME_METADATA) \
+	$(COMPAT_RUNTIME_NATIVE_SEQUENTIAL) \
 	$(COMPAT_SOURCE_GDAL_SHARED) \
 	$(COMPAT_SOURCE_EXACTIMAGE) \
 	$(COMPAT_SOURCE_IMLIB2) \
 	$(COMPAT_SOURCE_SAIL)
-COMPAT_REGRESS_TARGETS := \
+COMPAT_RUNTIME_REGRESS_TARGETS := \
 	compat-runtime-sf-103-empty-comment-regress \
 	compat-runtime-sf-64-no-image-desc-regress \
 	compat-runtime-metadata-regress \
+	compat-runtime-fbi-mtpaint-sequential-regress
+COMPAT_SOURCE_REGRESS_TARGETS := \
 	compat-source-gdal-shared-link-regress \
 	compat-source-exactimage-roundtrip-regress \
 	compat-source-sail-pkgconfig-regress \
 	compat-source-libwebp-static-link-regress \
 	compat-source-imlib2-sequential-regress
+COMPAT_REGRESS_TARGETS := \
+	$(COMPAT_RUNTIME_REGRESS_TARGETS) \
+	$(COMPAT_SOURCE_REGRESS_TARGETS)
 
 .PHONY: test clean safe-header-regress link-compat-regress internal-export-regress \
 	legacy-regress fileio-regress alloc-regress render-regress gif2rgb-regress \
 	gifbuild-regress gifclrmp-regress gifecho-regress giffilter-regress \
 	giffix-regress gifsponge-regress drawing-regress giftext-regress \
 	giftool-regress gifwedge-regress malformed-regress malformed-baseline-regress \
-	compat-regress $(COMPAT_REGRESS_TARGETS)
+	compat-regress compat-runtime-regress compat-source-regress $(COMPAT_REGRESS_TARGETS)
 
 test: $(APITEST) \
 	render-regress \
@@ -232,7 +239,21 @@ malformed-baseline-regress: $(MALFORMED_OBSERVE) $(MALFORMED_BASELINE) $(MALFORM
 	@diff -u $(MALFORMED_BASELINE) $@.regress
 	@rm -f $@.regress
 
-compat-regress: $(COMPAT_REGRESS_TARGETS)
+compat-runtime-regress: $(COMPAT_RUNTIME_REGRESS_TARGETS)
+ifeq ($(strip $(COMPAT_RUNTIME_REGRESS_TARGETS)),)
+	@echo "compat(runtime): no runtime-specific local reproducers registered."
+else
+	@echo "compat(runtime): completed $(words $(COMPAT_RUNTIME_REGRESS_TARGETS)) runtime reproducers."
+endif
+
+compat-source-regress: $(COMPAT_SOURCE_REGRESS_TARGETS)
+ifeq ($(strip $(COMPAT_SOURCE_REGRESS_TARGETS)),)
+	@echo "compat(source): no source-compat local reproducers registered."
+else
+	@echo "compat(source): completed $(words $(COMPAT_SOURCE_REGRESS_TARGETS)) source reproducers."
+endif
+
+compat-regress: compat-runtime-regress compat-source-regress
 ifeq ($(strip $(COMPAT_REGRESS_TARGETS)),)
 	@echo "compat: no issue-specific local reproducers registered."
 else
@@ -288,6 +309,14 @@ compat-runtime-metadata-regress: $(COMPAT_RUNTIME_METADATA)
 	@$(COMPAT_RUNTIME_METADATA) $(PICS)/fire.gif 30 60 33 1
 	@$(COMPAT_RUNTIME_METADATA) $(PICS)/treescap-interlaced.gif 40 40 1 1
 	@$(COMPAT_RUNTIME_METADATA) $(PICS)/welcome2.gif 290 48 6 0
+
+$(COMPAT_RUNTIME_NATIVE_SEQUENTIAL): $(COMPAT_DIR)/runtime-fbi-mtpaint-sequential/sequential_native_decode.c $(LIBGIF_STATIC) $(SAFE_HEADER)
+	$(CC) $(COMPAT_CFLAGS) $< $(LIBGIF_STATIC) $(LDLIBS) -o $@
+
+compat-runtime-fbi-mtpaint-sequential-regress: $(COMPAT_RUNTIME_NATIVE_SEQUENTIAL)
+	@echo "compat(runtime): fbi/mtpaint-style native sequential decode smoke."
+	@$(COMPAT_RUNTIME_NATIVE_SEQUENTIAL) $(PICS)/welcome2.gif 290 48 6
+	@$(COMPAT_RUNTIME_NATIVE_SEQUENTIAL) $(PICS)/treescap.gif 40 40 1
 
 $(COMPAT_SOURCE_GDAL_SHARED): $(COMPAT_DIR)/runtime-metadata/slurp_metadata.c $(LIBGIF_SHARED) $(SAFE_HEADER)
 	$(CC) $(COMPAT_CFLAGS) $< -L$(LIBGIF_RPATH) -Wl,-rpath,$(LIBGIF_RPATH) -lgif $(LDLIBS) -o $@
