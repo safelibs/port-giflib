@@ -38,8 +38,7 @@ override_dh_auto_install:
 		-e "s/@VERSION@/$(DEB_VERSION_UPSTREAM)/" \
 		debian/pkgconfig/libgif7.pc.in \
 		> $(TARGET_PKGCONFIG_DIR)/libgif7.pc
-	ln -sf /usr/lib/$(DEB_TARGET_MULTIARCH)/pkgconfig/libgif7.pc \
-		$(TARGET_PKGCONFIG_DIR)/libgif.pc
+	ln -sf libgif7.pc $(TARGET_PKGCONFIG_DIR)/libgif.pc
 
 override_dh_auto_clean:
 	dh_auto_clean
