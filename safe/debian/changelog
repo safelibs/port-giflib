@@ -1,3 +1,12 @@
+giflib (5.2.2-1ubuntu1+safelibs4) noble; urgency=medium
+
+  * Lock the library-only Debian package surface to the upstream
+    libgif7/libgif-dev contract.
+  * Scope the downstream Docker harness with shared package setup and
+    runtime/source selection via --scope.
+
+ -- SafeLibs Maintainers <safelibs@example.invalid>  Sun, 26 Apr 2026 12:00:00 -0700
+
 giflib (5.2.2-1ubuntu1+safelibs3) noble; urgency=medium
 
   * Add local source-matrix regressions for gdal, exactimage, sail, libwebp,

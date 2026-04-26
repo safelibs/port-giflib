@@ -23,6 +23,23 @@ Environment:
 EOF
 }
 
+validate_scope() {
+  case "$1" in
+    runtime|source|all)
+      return 0
+      ;;
+    "")
+      echo "missing value for --scope" >&2
+      ;;
+    *)
+      echo "invalid scope: $1" >&2
+      ;;
+  esac
+
+  usage >&2
+  exit 1
+}
+
 parse_args() {
   while (($#)); do
     case "$1" in
@@ -60,15 +77,7 @@ parse_args() {
     shift
   done
 
-  case "$GIFLIB_TEST_SCOPE" in
-    runtime|source|all) ;;
-    *)
-      echo "invalid scope: $GIFLIB_TEST_SCOPE" >&2
-      usage >&2
-      exit 1
-      ;;
-  esac
-
+  validate_scope "$GIFLIB_TEST_SCOPE"
   export GIFLIB_TEST_SCOPE
 }
 
@@ -1059,20 +1068,23 @@ run_source_checks() {
   test_imlib2_source
 }
 
-run_shared_setup
+run_selected_checks() {
+  case "$GIFLIB_TEST_SCOPE" in
+    runtime)
+      run_runtime_checks
+      ;;
+    source)
+      run_source_checks
+      ;;
+    all)
+      run_runtime_checks
+      run_source_checks
+      ;;
+  esac
+}
 
-case "$GIFLIB_TEST_SCOPE" in
-  runtime)
-    run_runtime_checks
-    ;;
-  source)
-    run_source_checks
-    ;;
-  all)
-    run_runtime_checks
-    run_source_checks
-    ;;
-esac
+run_shared_setup
+run_selected_checks
 
 log_step "All downstream checks passed"
 CONTAINER_SCRIPT
