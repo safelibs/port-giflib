@@ -1,4 +1,4 @@
-# Phase 4
+# Phase 04
 
 ## Phase Name
 Source-Build Dependent Matrix Fixes
@@ -64,8 +64,6 @@ Source-Build Dependent Matrix Fixes
 - update `test-original.sh` only if source-scope orchestration itself needs refinement
 
 ## Implementation Details
-- Before yielding, create exactly one non-merge git commit for this phase, with a subject that starts with `impl_04_source_dependents:`.
-- After that commit, leave the tracked worktree and index clean before yielding: `git status --short --untracked-files=no` must be empty, `git diff --quiet --exit-code` must succeed, and `git diff --cached --quiet --exit-code` must succeed.
 - Focus on compile/link/install surface compatibility:
   - extracted package contents
   - `pkg-config` behavior
@@ -74,6 +72,7 @@ Source-Build Dependent Matrix Fixes
   - header-only source compatibility
 - Consume the existing 13-entry `dependents.json` inventory in place. Do not recollect, regenerate, or replace the downstream app list unless that inventory is proven wrong.
 - Preserve the current Rust conventions while fixing source-build failures: keep the original subsystem split across `safe/src/`, keep C-style FFI names and parameter casing at the ABI boundary, keep `#![deny(unsafe_op_in_unsafe_fn)]` enabled, and keep remaining `unsafe` explicit with nearby `SAFETY:` comments.
+- Consume the existing package metadata, local regressions, and downstream harness in place rather than introducing alternate packaging surfaces.
 - Treat these source consumers as the concrete package/build gate:
   - `gdal`
   - `exactimage`

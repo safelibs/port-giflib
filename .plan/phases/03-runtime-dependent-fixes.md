@@ -1,4 +1,4 @@
-# Phase 3
+# Phase 03
 
 ## Phase Name
 Runtime Dependent Matrix Fixes
@@ -57,12 +57,11 @@ Runtime Dependent Matrix Fixes
 - update `test-original.sh` only if the runtime probe itself needs stabilization
 
 ## Implementation Details
-- Before yielding, create exactly one non-merge git commit for this phase, with a subject that starts with `impl_03_runtime_dependents:`.
-- After that commit, leave the tracked worktree and index clean before yielding: `git status --short --untracked-files=no` must be empty, `git diff --quiet --exit-code` must succeed, and `git diff --cached --quiet --exit-code` must succeed.
 - Focus on runtime behavior exercised by the installed library, not source-build/package metadata.
 - Consume the existing 13-entry `dependents.json` inventory in place. Do not recollect, regenerate, or replace the downstream app list unless that inventory is proven wrong.
 - Preserve the current Rust conventions while fixing runtime bugs: keep the original subsystem split across `safe/src/`, keep C-style FFI names and parameter casing at the ABI boundary, keep `#![deny(unsafe_op_in_unsafe_fn)]` enabled, and keep remaining `unsafe` explicit with nearby `SAFETY:` comments.
 - Preserve the byte-for-byte public header match and do not invent new API surface while resolving runtime-only failures.
+- Consume the existing local and downstream harnesses in place. Do not create alternate runtime matrices or vendor downstream sources.
 - Treat these downstream apps as the concrete behavior gate for runtime compatibility:
   - `giflib-tools`: text dump and general decode path
   - `webp`/`gif2webp`: valid GIF decode and animation ingestion

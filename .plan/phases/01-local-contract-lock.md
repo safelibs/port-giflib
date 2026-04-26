@@ -1,4 +1,4 @@
-# Phase 1
+# Phase 01
 
 ## Phase Name
 Local Contract Lock And Regression Gap Closure
@@ -47,6 +47,7 @@ Local Contract Lock And Regression Gap Closure
 - Preserve the current Rust-only build. This phase must not add bootstrap C compilation back into `safe/build.rs`.
 - Preserve the current Rust code and test conventions: keep the original subsystem split across `safe/src/`, keep C-style FFI names and mostly C-style parameter casing at the ABI boundary, keep `#![deny(unsafe_op_in_unsafe_fn)]` enabled, and keep remaining `unsafe` explicit with nearby `SAFETY:` comments.
 - Preserve the byte-for-byte public header match between `safe/include/gif_lib.h` and `original/gif_lib.h`.
+- Consume existing artifacts in place. Do not copy or vendor the upstream oracle corpus into `safe/tests/`.
 - Add `compat-regress` to `safe/tests/Makefile` as the single aggregator for future issue-specific tests.
 - Keep `safe/tests/Makefile` aligned with the upstream test structure, which means `gif2rgb-regress` remains an explicit target whenever full local coverage is claimed.
 - Add `safe/tests/compat/README.md` describing:
@@ -65,8 +66,6 @@ Local Contract Lock And Regression Gap Closure
 - If local iteration edits encoder/write/quantize/drawing files such as `safe/src/encode.rs`, `safe/src/gcb.rs`, `safe/src/helpers.rs`, `safe/src/quantize.rs`, or `safe/src/draw.rs`, rerun `gifbuild-regress`, `gifsponge-regress`, `giftool-regress`, `giffix-regress`, `gif2rgb-regress`, `gifecho-regress`, `drawing-regress`, and `gifwedge-regress` before yielding.
 - If local iteration edits hot-path files `safe/src/decode.rs`, `safe/src/encode.rs`, `safe/src/quantize.rs`, `safe/src/helpers.rs`, `safe/src/state.rs`, or `safe/src/io.rs`, rerun `safe/tests/perf_compare.sh` before yielding.
 - If local iteration edits FFI entry points or raw-pointer-heavy code, rerun the `SAFETY:` audit and keep panic fencing at the C ABI boundary before yielding.
-- Before yielding, create exactly one non-merge git commit for this phase, with a subject that starts with `impl_01_local_contract:`.
-- After that commit, leave the tracked worktree and index clean before yielding: `git status --short --untracked-files=no` must be empty, `git diff --quiet --exit-code` must succeed, and `git diff --cached --quiet --exit-code` must succeed.
 
 ## Verification Phases
 ### `check_01_local_matrix`
